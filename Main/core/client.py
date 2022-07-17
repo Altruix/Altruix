@@ -59,7 +59,7 @@ class AltruixClient:
         self.cmd_list = {}
         self.all_lang_strings = {}
         self.auto_approve = False
-        self.__version__ = "0.0.1"
+        self.__version__ = "0.0.2"
         self.selected_lang = "english"
         self.local_lang_file = "./Main/localization"
         self.cmd_list = {}
