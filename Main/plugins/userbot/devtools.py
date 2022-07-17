@@ -50,7 +50,7 @@ async def get_json(c: Client, m: Message):
     ["ex", "exec", "eval"],
     cmd_help={
         "help": "Executes the python snippet inside telegram.",
-        "example": "eval print('Helloworld')",
+        "example": "eval print('Hello World!')",
         "user_args": {
             "file": "Force sends the output as a file.",
             "paste": "Pastes the output to pastebin.",
@@ -58,7 +58,7 @@ async def get_json(c: Client, m: Message):
     },
     just_exc=True,
 )
-async def evaluate(c: Client, m: Message):
+async def evaluate_command_handler(c: Client, m: Message):
     msg_id = m.id
     m_ = await m.handle_message("PROCESSING")
     user_args = m.user_args

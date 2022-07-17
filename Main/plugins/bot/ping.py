@@ -12,7 +12,7 @@ from Main import Altruix
 from style import ping_format as pf
 from pyrogram import Client, filters
 from pyrogram.raw.functions import Ping
-from Main.core.decorators import iuser_check
+from Main.core.decorators import iuser_check, log_errors
 from Main.utils.essentials import Essentials
 from pyrogram.types import (
     Message, InlineQuery, CallbackQuery, InlineKeyboardButton,
@@ -22,6 +22,7 @@ from pyrogram.types import (
 @Altruix.bot.on_message(
     filters.command("ping", "/") & filters.user(Altruix.config.OWNER_ID)
 )
+@log_errors
 async def restart_command_handler(c: Client, m: Message):
     start = time.perf_counter()
     await c.invoke(Ping(ping_id=9999999))
@@ -39,6 +40,7 @@ async def restart_command_handler(c: Client, m: Message):
 
 
 @Altruix.bot.on_callback_query(filters.regex("^ping"))
+@log_errors
 async def ping_cb_handler(c: Client, cb: CallbackQuery):
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
     start = time.perf_counter()
@@ -60,6 +62,7 @@ async def ping_cb_handler(c: Client, cb: CallbackQuery):
 
 
 @Altruix.bot.on_inline_query(filters.regex("^ping"))
+@log_errors
 @iuser_check
 async def ping_inline_handler(c: Client, iq: InlineQuery):
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)

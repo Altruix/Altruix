@@ -11,8 +11,11 @@ from Main import Altruix
 from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 
+from Main.core.decorators import log_errors
+
 
 @Altruix.bot.on_message(filters.command("add", "/"))
+@log_errors
 async def add_session_command_handler(_, m: Message):
     if m.from_user.id not in Altruix.auth_users:
         return await m.reply_text("Hey, I'm just a bot. Powered by @AltruixUB.")

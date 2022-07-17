@@ -6,7 +6,6 @@
 #
 # All rights reserved.
 
-
 from pyromod import listen
 from .core.client import AltruixClient
 

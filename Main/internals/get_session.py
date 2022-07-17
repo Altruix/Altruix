@@ -17,8 +17,11 @@ from pyrogram.types import (
     Message, ForceReply, CallbackQuery, KeyboardButton, ReplyKeyboardMarkup,
     ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup)
 
+from Main.core.decorators import log_errors
+
 
 @Altruix.bot.on_message(filters.command("start", "/"))
+@log_errors
 async def start_command_handler(_, m: Message):
     path_ = "./cache/bot_st_media.*"
     file = glob.glob(path_)[0] if glob.glob(path_) else "./Main/assets/images/logo.jpg"
@@ -56,6 +59,7 @@ async def start_command_handler(_, m: Message):
 
 
 @Altruix.bot.on_callback_query(filters.regex("^session_yes"))
+@log_errors
 async def add_session_cb_handler(_, cb: CallbackQuery):
     with contextlib.suppress(Exception):
         await cb.message.delete()

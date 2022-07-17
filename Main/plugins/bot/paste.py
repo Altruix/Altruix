@@ -12,7 +12,7 @@ from Main import Altruix
 from pyrogram import filters
 from Main.utils.paste import Paste
 from Main.core.types.message import Message
-from Main.core.decorators import iuser_check
+from Main.core.decorators import iuser_check, log_errors
 from Main.utils.essentials import Essentials
 from Main.utils.helpers import arrange_buttons
 from pyrogram.types import (
@@ -23,6 +23,7 @@ from pyrogram.types import (
 @Altruix.bot.on_message(
     filters.command("paste", "/") & filters.user(Altruix.config.OWNER_ID)
 )
+@log_errors
 async def paste_bot_cmd_handler(_, m: Message):
     if mess := m.reply_to_message:
         if mess.text:
@@ -44,6 +45,7 @@ async def paste_bot_cmd_handler(_, m: Message):
 
 
 @Altruix.bot.on_callback_query(filters.regex(r"paste_to_(\w+)#(\w+)"))
+@log_errors
 @iuser_check
 async def paste_cb_handler(_, cb: CallbackQuery):
     await cb.answer(
@@ -67,6 +69,7 @@ async def paste_cb_handler(_, cb: CallbackQuery):
         r"(paste_url\:((?:(?:https?:\/\/)?[\w-]+(?:\.[\w-]+)+\.?(?::\d+)?(?:\/\S*)?))|paste_menu\:(\w+))"
     )
 )
+@log_errors
 @iuser_check
 async def paste_inline_handler(_, iq: InlineQuery):
     if iq.matches[0].group(1).startswith("paste_menu"):

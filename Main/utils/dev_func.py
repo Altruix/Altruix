@@ -30,6 +30,8 @@ async def execute_py(c: Client, code: str, m: Message):
     exec(
         "async def __exec_py(c, m):"
         + "\n rm = m.reply_to_message"
+        + "\n message = m"
+        + "\n client = Client = c"
         + "\n chat = m.chat"
         + "\n user = m.from_user"
         + "".join(f"\n {l}" for l in code.split("\n"))

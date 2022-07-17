@@ -12,13 +12,14 @@ from Main import Altruix
 from style import ping_format as pf
 from pyrogram import Client, filters
 from Main.core.types.message import Message
-from Main.core.decorators import iuser_check, inline_check
+from Main.core.decorators import iuser_check, inline_check, log_errors
 from pyrogram.types import (
     Message, InlineQuery, CallbackQuery, InlineKeyboardButton,
     InlineKeyboardMarkup, InputTextMessageContent, InlineQueryResultArticle)
 
 
 @Altruix.bot.on_callback_query(filters.regex("^(restart|reload)_confirm"))
+@log_errors
 @iuser_check
 async def restart_cb_handler(_, cb: CallbackQuery):
     await cb.answer("Hang on..", show_alert=True)
@@ -34,6 +35,7 @@ async def restart_cb_handler(_, cb: CallbackQuery):
 
 
 @Altruix.bot.on_callback_query(filters.regex("^(restart|reload)_cancel"))
+@log_errors
 @iuser_check
 async def restart_cb_handler(c: Client, cb: CallbackQuery):
     await cb.answer("Alright", show_alert=True)
@@ -47,6 +49,7 @@ async def restart_cb_handler(c: Client, cb: CallbackQuery):
 @Altruix.bot.on_message(
     filters.command(["restart", "reload"], "/") & filters.user(Altruix.config.OWNER_ID)
 )
+@log_errors
 async def restart_command_handler(_, m: Message):
     reload_only = m.command[0] == "reload"
     await m.reply(
@@ -67,6 +70,7 @@ async def restart_command_handler(_, m: Message):
 
 
 @Altruix.bot.on_inline_query(filters.regex("^(restart|reload)"))
+@log_errors
 @iuser_check
 async def ping_inline_handler(_, iq: InlineQuery):
     soft = iq.query.lower() == "reload"

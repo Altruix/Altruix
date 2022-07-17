@@ -20,6 +20,8 @@ from pyrogram.errors import (
     PhoneCodeInvalid, UsernameOccupied, PhoneNumberInvalid,
     UsernameNotModified, SessionPasswordNeeded)
 
+from Main.core.decorators import log_errors
+
 
 async def client_session(api_id, api_hash):
     return Client(
@@ -28,6 +30,7 @@ async def client_session(api_id, api_hash):
 
 
 @Altruix.bot.on_callback_query(filters.regex("^session_no"))
+@log_errors
 async def add_session_cb_handler(_, cb: CallbackQuery):
     with contextlib.suppress(Exception):
         await cb.message.delete()

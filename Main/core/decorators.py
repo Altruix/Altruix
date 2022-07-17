@@ -6,14 +6,14 @@
 #
 # All rights reserved.
 
-
+import traceback
 from Main import Altruix
-from typing import Union
+from typing import Any, Union
 from functools import wraps
-from pyrogram import Client
+from pyrogram import Client, StopPropagation, ContinuePropagation
 from Main.internals.set_inline import set_inline_in_botfather
 from pyrogram.types import Message, InlineQuery, CallbackQuery
-from pyrogram.errors import BotInlineDisabled, MessageNotModified
+from pyrogram.errors import BotInlineDisabled, MessageNotModified, MessageIdInvalid, UserNotParticipant, MessageEmpty
 
 
 def inline_check(func):
@@ -76,7 +76,7 @@ def iuser_check(func):
         users = Altruix.auth_users
         if update.from_user and update.from_user.id in users:
             try:
-                await func(client, update)
+                return await func(client, update)
             except MessageNotModified:
                 await update.answer("🤔🧐😳🙄😬🤭😶‍🌫️")
         elif isinstance(update, CallbackQuery):
@@ -93,5 +93,30 @@ def iuser_check(func):
                 switch_pm_text="You are not authorized to use me.",
                 switch_pm_parameter="auth",
             )
+
+    return wrapper
+
+def log_errors(func):
+    """Log exceptions."""
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except StopPropagation as e:
+            raise StopPropagation from e
+        except (
+            MessageNotModified,
+            MessageIdInvalid,
+            UserNotParticipant,
+            MessageEmpty,
+        ):
+            pass
+        except ContinuePropagation as e:
+            raise ContinuePropagation from e
+        except Exception as _be:
+            try:
+                await Altruix.bot.send_message(Altruix.log_chat or Altruix.config.OWNER_ID, f"<b>AN ERROR OCCURRED:</b>\nException: <i>{_be}</i>\nOccurred in: <code>{func.__name__}</code>\n\n<code>{traceback.format_exc()}</code>")
+            except Exception as e:
+                raise _be from e
 
     return wrapper

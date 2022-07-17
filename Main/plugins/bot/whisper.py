@@ -10,6 +10,7 @@
 import uuid
 from Main import Altruix
 from pyrogram import Client, enums, filters
+from Main.core.decorators import log_errors
 from Main.plugins.userbot.channel_utils import digit_wrap
 from pyrogram.types import (
     InlineQuery, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
@@ -20,6 +21,7 @@ MSGS_DICT = {}
 
 
 @Altruix.bot.on_inline_query(filters.regex("^whisper"))
+@log_errors
 async def whisper(c: Client, iq: InlineQuery):
     if " " not in iq.query:
         return
@@ -60,6 +62,7 @@ async def whisper(c: Client, iq: InlineQuery):
 
 
 @Altruix.bot.on_callback_query(filters.regex("^whisper_(.*)"))
+@log_errors
 async def whisper_callback(c: Client, cq: CallbackQuery):
     _id = digit_wrap(cq.matches[0].group(1))
     if _id not in MSGS_DICT:

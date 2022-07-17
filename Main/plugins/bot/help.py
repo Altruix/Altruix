@@ -8,11 +8,12 @@
 
 
 import re
+from typing import Optional
 import pyrogram
 from Main import Altruix
 from platform import python_version
 from pyrogram import Client, filters
-from Main.core.decorators import iuser_check
+from Main.core.decorators import iuser_check, log_errors
 from pyrogram.types import (
     InlineQuery, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
     InputTextMessageContent, InlineQueryResultArticle)
@@ -26,6 +27,7 @@ cache_help_menu = None
 multi_pages = False
 
 
+@log_errors
 async def get_help_menu(return_all: bool = False):
     global cache_help_menu
     global multi_pages
@@ -66,7 +68,7 @@ async def get_help_menu(return_all: bool = False):
         return cache_help_menu[0]
     return cache_help_menu
 
-
+@log_errors
 async def get_plugin_data(plugin: str, number: int = 0):
     text = f"<b>Help for</b> <code>{plugin}</code>\n\n{Altruix.CLIST[plugin.lower()].strip()}"
     buttons = InlineKeyboardMarkup(
@@ -76,11 +78,13 @@ async def get_plugin_data(plugin: str, number: int = 0):
 
 
 @Altruix.bot.on_callback_query(filters.regex('close_help'))
+@log_errors
 @iuser_check
 async def close_help(c: Client, cq: CallbackQuery):
     await cq.edit_message_text('<b>Help Menu Closed 🔐</b>', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Re-Open', 're_open')]]))
 
 @Altruix.bot.on_inline_query(filters.regex("^change_lang", flags=re.IGNORECASE))
+@log_errors
 @iuser_check
 async def reload_language(c: Client, iq: InlineQuery):
     bttns = [
@@ -106,6 +110,7 @@ async def reload_language(c: Client, iq: InlineQuery):
 
 
 @Altruix.bot.on_callback_query(filters.regex("^reload_lang_(.*)"))
+@log_errors
 @iuser_check
 async def change_lang(c: Client, cb: CallbackQuery):
     lang = cb.matches[0].group(1)
@@ -120,39 +125,51 @@ async def change_lang(c: Client, cb: CallbackQuery):
     return await cb.answer(Altruix.get_string("LANG_SELECTED"))
 
 
-@Altruix.bot.on_inline_query(filters.regex("^help", flags=re.IGNORECASE))
+@Altruix.bot.on_inline_query(filters.regex("^help ?(.+)?", flags=re.IGNORECASE))
+@log_errors
 @iuser_check
 async def help(_: Client, iq: InlineQuery):
-    plugin = iq.query.lower().replace("help", "").strip()
+    plugin: Optional[str] = iq.matches[0].group(1)
     if not plugin:
         buttons = await get_help_menu()
         await iq.answer(
             results=[
                 InlineQueryResultArticle(
-                    title=help_text,
+                    title="Help Menu",
                     input_message_content=InputTextMessageContent(help_text),
                     reply_markup=InlineKeyboardMarkup(buttons),
                 )
             ]
         )
-    elif plugin in Altruix.CLIST:
+    elif plugin.strip() in Altruix.CLIST:
         text, _ = await get_plugin_data(plugin.lower())
         await iq.answer(
             results=[
                 InlineQueryResultArticle(
                     title=f"Help Module for {plugin}",
                     input_message_content=InputTextMessageContent(text),
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Goto help menu', 'help')]]),
                 )
             ]
         )
+    else:
+        await iq.answer(
+            results=[
+                InlineQueryResultArticle(
+                    title="Plugin not found!",
+                    input_message_content=InputTextMessageContent(f"Help for {plugin} is not found!"),
+                )]
+        )
 
 @Altruix.bot.on_callback_query(filters.regex('^re_open'))
+@log_errors
 @iuser_check
 async def re_help(c: Client, cq: CallbackQuery):
     buttons = await get_help_menu()
     await cq.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(buttons))
 
 @Altruix.bot.on_callback_query(filters.regex("^help"))
+@log_errors
 @iuser_check
 async def help_callback(_: Client, cq: CallbackQuery):
     data = cq.data.lower().split("#")
