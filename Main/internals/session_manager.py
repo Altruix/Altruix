@@ -13,7 +13,7 @@ from Main.core.decorators import log_errors
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 
 
-@Altruix.bot.on_message(filters.command("add", "/"))
+@Altruix.bot.on_message(filters.command("add", "/") & filters.user(Altruix.auth_users))
 @log_errors
 async def add_session_command_handler(_, m: Message):
     if m.from_user.id not in Altruix.auth_users:
