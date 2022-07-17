@@ -67,18 +67,18 @@ def splitter(input_):
     len_ = len(input_)
     if len_ == 1:
         return (
-            ("AltruiX", 500, choice(colours))
+            ("Altruix", 500, choice(colours))
             if input_[0] == ""
             else (input_[0], 500, choice(colours))
         )
     elif len_ == 2:
         if input_[0] == "":
-            return "AltruiX", 500, choice(colours)
+            return "Altruix", 500, choice(colours)
         if input_[1].isnumeric():
             return input_[0], int(input_[1]), choice(colours)
         return input_[0], 500, choice(colours)
     if input_[0] == "":
-        return "AltruiX", 500, choice(colours)
+        return "Altruix", 500, choice(colours)
     if not input_[1].isnumeric():
         return (
             input_[0],
@@ -96,7 +96,7 @@ def splitter(input_):
     ["logo"],
     cmd_help={
         "help": "Makes logo frong given text.",
-        "example": "logo AltruiX|1000|255 0 102",
+        "example": "logo Altruix|1000|255 0 102",
     },
 )
 async def logo(c: Client, m: Message):

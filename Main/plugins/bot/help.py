@@ -19,10 +19,9 @@ from pyrogram.types import (
 
 
 help_text = f"""<b><u>Altruix Help Menu</u></b>
-<b>AltruiX Version :</b> <code>V{Altruix.__version__}</code>
-<b>Pyrogram Version :</b> <code>V{pyrogram.__version__} </code>
-<b>Python Version :</b> <code>V{python_version()}</code>
-<b>Copyright (C)</b> 2021-present @AltruixDevs"""
+<b>Userbot version :</b> <code>V{Altruix.__version__}</code>
+<b>Pyrogram version :</b> <code>V{pyrogram.__version__} </code>
+<b>Python version :</b> <code>V{python_version()}</code>"""
 cache_help_menu = None
 multi_pages = False
 
@@ -96,9 +95,9 @@ async def reload_language(c: Client, iq: InlineQuery):
     await iq.answer(
         results=[
             InlineQueryResultArticle(
-                title="Change AltruiX default language",
+                title="Change Altruix default language",
                 input_message_content=InputTextMessageContent(
-                    "<b>AltruiX Language Set-up Wizard</b> \n<b>Click a language available below to change Altruix's default langauge</b>"
+                    "<b>Altruix Language Set-up Wizard</b> \n<b>Click a language available below to change Altruix's default langauge</b>"
                 ),
                 reply_markup=InlineKeyboardMarkup(bttns),
             )

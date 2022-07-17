@@ -29,7 +29,7 @@ async def update(client, message: Message):
     if "-changelog" in message.user_args:
         repo = await updater_.init_repo()
         if cl := await updater_.gen_changelog(repo, message, Altruix.config.REPO):
-            cl = f"<b>Change-log for AltruiX <i>v{Altruix.__version__}</i></b> \n{cl}"
+            cl = f"<b>Change-log for Altruix <i>v{Altruix.__version__}</i></b> \n{cl}"
         else:
             cl = "NO_CHANGES"
         await msg.edit_msg(cl)

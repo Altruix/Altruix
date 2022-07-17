@@ -1,7 +1,7 @@
-<h1 align="center"><b>AltruiX | UserBot</b></h1>
+<h1 align="center"><b>Altruix | UserBot</b></h1>
 <p align="center"><img src="https://telegra.ph/file/f51efe570b5f0a9165f8e.png"; width="1155px"><br></p>  
 
-#### **AltruiX** | A Modern yet simple UserBot which is based on Pyrogram. **Built By The Developers Of Friday Userbot.** 
+#### **Altruix** | A Modern yet simple UserBot which is based on Pyrogram. **Built By The Developers Of Friday Userbot.** 
 <br>
 
 # Deploying To Different Platforms
@@ -11,15 +11,15 @@
 
 # Official Support/Updates
 > - Join the official **Updates** Channel  
->    <a href="https://t.me/AltruiXUB"><img src="https://img.shields.io/badge/Join-AltruiX%20Channel-red.svg?logo=Telegram"></a>  
+>    <a href="https://t.me/AltruiXUB"><img src="https://img.shields.io/badge/Join-Altruix%20Channel-red.svg?logo=Telegram"></a>  
 > - Join the official **Support** Chat  
->    <a href="https://t.me/AltruixChat"><img src="https://img.shields.io/badge/Join-AltruiX%20Group-blue.svg?logo=telegram"></a>
+>    <a href="https://t.me/AltruixChat"><img src="https://img.shields.io/badge/Join-Altruix%20Group-blue.svg?logo=telegram"></a>
 
 <br>
 
 ## Deploy Locally
 
-If you want to Deploy your AltruiX UserBot on your PC or in Termux these are the steps -
+If you want to Deploy your Altruix UserBot on your PC or in Termux these are the steps -
 
 > ```
 > git clone https://github.com/Altruix/Altruix
@@ -34,7 +34,7 @@ Example of [`.env`](#env)
 
 ## String Session
 
-It's not necessary until you host the bot. You can get the String Session after you are done with hosting. Just run the AltruiX Assistant bot and walk through the steps. 
+It's not necessary until you host the bot. You can get the String Session after you are done with hosting. Just run the Altruix Assistant bot and walk through the steps. 
 
 ## Required Variables
 
@@ -106,12 +106,12 @@ It's not necessary until you host the bot. You can get the String Session after 
 
 ## About the Repo
 
-> Currently Running Stable version of AltruiX.  
-> [![](https://img.shields.io/badge/AltruiX-v0.0.1-color=red)](#)  
+> Currently Running Stable version of Altruix.  
+> [![](https://img.shields.io/badge/Altruix-v0.0.1-color=red)](#)  
 > Is our project under active maintenance?  
-> [![Maintenance](https://img.shields.io/badge/Maintained%3F-Yes-color=green)](https://github.com/AltruiX/Altruix/graphs/commit-activity)   
+> [![Maintenance](https://img.shields.io/badge/Maintained%3F-Yes-color=green)](https://github.com/Altruix/Altruix/graphs/commit-activity)   
 > Developers aka Contributors for the Project.  
-> [![Contributors](https://img.shields.io/github/contributors/AltruiX/Altruix?style=flat-square&color=orange)](https://github.com/AltruiX/Altruix/graphs/contributors)
+> [![Contributors](https://img.shields.io/github/contributors/Altruix/Altruix?style=flat-square&color=orange)](https://github.com/Altruix/Altruix/graphs/contributors)
 
 ## Credits
 

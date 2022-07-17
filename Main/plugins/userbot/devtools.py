@@ -188,7 +188,7 @@ async def logs(c: Client, m: Message):
     if "-s" in log__args_ and Altruix.log_chat:
         msg = (
             await c.send_document(
-                Altruix.log_chat, log_file_, file_name="AltruiX_logs.txt", caption='LOGS of your AltruiX Userbot.'
+                Altruix.log_chat, log_file_, file_name="AltruiX_logs.txt", caption='LOGS of your Altruix Userbot.'
             )
             if "_paste" not in log__args_
             else await c.send_message(
