@@ -40,8 +40,8 @@ from ..utils.custom_filters import user_filters
 from ..utils.startup_helpers import concatenate
 from Main.utils.heroku_ import prepare_heroku_url
 from concurrent.futures import ThreadPoolExecutor
-from pyrogram.types import Message, CallbackQuery, User
 from typing import Any, Dict, List, Union, Optional
+from pyrogram.types import User, Message, CallbackQuery
 from ..utils.multi_lang_helpers import get_all_files_in_path
 from pyrogram import (
     Client, StopPropagation, ContinuePropagation, idle, filters,
@@ -190,12 +190,12 @@ class AltruixClient:
             )
         self.log("Localization setup complete!")
 
-    def get_string(self, keyword: str, default: str = None, args: tuple = None):    
+    def get_string(self, keyword: str, default: str = None, args: tuple = None):
         selected_lang = self.selected_lang
         if self.all_lang_strings.get(selected_lang) and self.all_lang_strings.get(
             selected_lang
         ).get(keyword):
-            str_ing = self.all_lang_strings.get(selected_lang).get(keyword)  or default
+            str_ing = self.all_lang_strings.get(selected_lang).get(keyword) or default
             return (
                 (
                     str_ing.format(*args)
@@ -577,7 +577,8 @@ class AltruixClient:
                     ).start()
                     client.myself = await client.get_me()
                     self.clients.append(client)
-                    if not client.myself.id == self.config.OWNER_ID: self.ourselves.append(client.myself)
+                    if not client.myself.id == self.config.OWNER_ID:
+                        self.ourselves.append(client.myself)
                     self.log(f"[{count + 1}/{len(string_sessions)}] Sessions Loaded.")
                 except Exception as err:
                     self.log(
@@ -611,7 +612,8 @@ class AltruixClient:
         await app.start()
         session_user_info = await app.get_me()
         app.myself = session_user_info
-        if not app.myself.id == self.config.OWNER_ID: self.ourselves.append(session_user_info)
+        if not app.myself.id == self.config.OWNER_ID:
+            self.ourselves.append(session_user_info)
         self.traning_wheels_protocol = False
         await self.load_all_modules()
         self.log("Userbot plugins have been loaded.")
@@ -620,7 +622,6 @@ class AltruixClient:
                 "<b>Account Successfully added!</b>",
             )
         return app
-
 
     async def remove_session(self, index: int) -> User:
         session = self.config.pop_session(index)

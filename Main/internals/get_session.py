@@ -25,7 +25,9 @@ async def start_command_handler(_, m: Message):
     payload = m.text.replace("/start", "").strip()
     if not payload:
         path_ = "./cache/bot_st_media.*"
-        file = glob.glob(path_)[0] if glob.glob(path_) else "./Main/assets/images/logo.jpg"
+        file = (
+            glob.glob(path_)[0] if glob.glob(path_) else "./Main/assets/images/logo.jpg"
+        )
         await m.reply_file(
             file,
             caption=Altruix.get_string("BOT_ST_MSG").format(
@@ -44,7 +46,9 @@ async def start_command_handler(_, m: Message):
                 ),
             )
             _ = await m.from_user.listen()
-            await m.reply("Alright, let's get started.", reply_markup=ReplyKeyboardRemove())
+            await m.reply(
+                "Alright, let's get started.", reply_markup=ReplyKeyboardRemove()
+            )
             await asyncio.sleep(1)
             await m.reply(
                 "Do you have the string session already generated?.",
@@ -58,25 +62,27 @@ async def start_command_handler(_, m: Message):
                 ),
             )
     elif payload == "add_session":
-            await m.reply("Alright, let's get started.", reply_markup=ReplyKeyboardRemove())
-            await asyncio.sleep(1)
-            await m.reply(
-                "Do you have the string session already generated?.",
-                reply_markup=InlineKeyboardMarkup(
+        await m.reply("Alright, let's get started.", reply_markup=ReplyKeyboardRemove())
+        await asyncio.sleep(1)
+        await m.reply(
+            "Do you have the string session already generated?.",
+            reply_markup=InlineKeyboardMarkup(
+                [
                     [
-                        [
-                            InlineKeyboardButton("Yes", callback_data="session_yes"),
-                            InlineKeyboardButton("No", callback_data="session_no"),
-                        ]
+                        InlineKeyboardButton("Yes", callback_data="session_yes"),
+                        InlineKeyboardButton("No", callback_data="session_no"),
                     ]
-                ),
-            )
+                ]
+            ),
+        )
 
 
 @Altruix.bot.on_callback_query(filters.regex("^add_session"))
 @log_errors
 async def add_session_menu_cb_handler(_, cb: CallbackQuery):
-    await cb.message.edit("Alright, let's get started.", reply_markup=ReplyKeyboardRemove())
+    await cb.message.edit(
+        "Alright, let's get started.", reply_markup=ReplyKeyboardRemove()
+    )
     await asyncio.sleep(1)
     await cb.message.reply(
         "Do you have the string session already generated?.",
@@ -89,6 +95,7 @@ async def add_session_menu_cb_handler(_, cb: CallbackQuery):
             ]
         ),
     )
+
 
 @Altruix.bot.on_callback_query(filters.regex("^session_yes"))
 @log_errors
@@ -115,5 +122,7 @@ async def add_session_cb_handler(_, cb: CallbackQuery):
         "<code>Processing the given string session...</code>"
     )
     new_session = await Altruix.add_session(session, status)
-    await new_session.send_message(Altruix.bot.info.id, "<b>Altruix have been successfully connected with your account!</b> \nPlease visit @AltruixUB for any support or help!")
-    
+    await new_session.send_message(
+        Altruix.bot.info.id,
+        "<b>Altruix have been successfully connected with your account!</b> \nPlease visit @AltruixUB for any support or help!",
+    )
