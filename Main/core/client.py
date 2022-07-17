@@ -25,6 +25,7 @@ import traceback
 import multiprocessing
 from pathlib import Path
 from functools import wraps
+from datetime import datetime
 from Main.core.apm import APM
 from cachetools import TTLCache
 from traceback import format_exc
@@ -91,14 +92,14 @@ class AltruixClient:
 
     @property
     def banner(self):
-        return """
+        return f"""
      _    _ _              _
     / \\  | | |_ _ __ _   _(_)_  __
    / _ \\ | | __| '__| | | | \\ \\/ /
   / ___ \\| | |_| |  | |_| | |>  <
  /_/   \\_\\_|\\__|_|   \\__,_|_/_/\\_\\
 
- (C) Project-Altruix 2021-present
+ (C) Project-Altruix 2021-{datetime.today().year}
         """
 
     @property
@@ -474,7 +475,7 @@ class AltruixClient:
 
     async def _run(self):
         await self.load_all_modules()
-        self.log(self.banner)
+        print(self.banner)
         self.log(
             f"Altruix v{self.__version__} has been successfully deployed with pyrogram version v{pyrogram_version}!"
         )
