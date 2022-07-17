@@ -189,6 +189,8 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
     filters.private & ~filters.group & ~filters.channel, 3, bot_mode_unsupported=True
 )
 async def pm_permit_(c: Client, m: Message):
+    if not Altruix.config.PM_ENABLE:
+        return
     if (
         (not m)
         or (not m.from_user)
