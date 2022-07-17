@@ -493,6 +493,7 @@ class AltruixClient:
         await idle()
 
     async def _test(self):
+        dev_chat_id = -1001575127028
         try:
             await self.load_all_modules()
             mess = None
@@ -502,13 +503,13 @@ class AltruixClient:
                 self.log("Testing User session.", level=30)
                 for each in self.clients:
                     mess = await each.send_message(
-                        -1001574329409,
+                        dev_chat_id,
                         f"""commit: <a href='https://github.com/Altruix/Altruix/commit/{os.getenv("COMMIT_SHA")}'>{os.getenv('COMMIT_NAME')}</a> was successfully tested!""",
                     )
                     await each.stop()
             self.log("Testing bot.", level=30)
             await self.bot.send_message(
-                -1001574329409,
+                dev_chat_id,
                 "Test completed.",
                 reply_to_message_id=mess.id if mess else None,
             )
