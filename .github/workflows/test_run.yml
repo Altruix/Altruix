@@ -22,9 +22,9 @@ jobs:
     if: "!contains(github.event.head_commit.message, 'auto: format / refactor')"
     steps:
       - name: Init
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ github.token }}
       - name: "Cancelling duplicate workflow runs"
         uses: styfle/cancel-workflow-action@0.9.0
         with:
