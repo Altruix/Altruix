@@ -8,12 +8,14 @@
 
 import traceback
 from Main import Altruix
-from typing import Any, Union
+from typing import Union
 from functools import wraps
-from pyrogram import Client, StopPropagation, ContinuePropagation
 from Main.internals.set_inline import set_inline_in_botfather
 from pyrogram.types import Message, InlineQuery, CallbackQuery
-from pyrogram.errors import BotInlineDisabled, MessageNotModified, MessageIdInvalid, UserNotParticipant, MessageEmpty
+from pyrogram import Client, StopPropagation, ContinuePropagation
+from pyrogram.errors import (
+    MessageEmpty, MessageIdInvalid, BotInlineDisabled, MessageNotModified,
+    UserNotParticipant)
 
 
 def inline_check(func):
@@ -33,7 +35,7 @@ def inline_check(func):
 def check_perm(perm_type, return_perm=False):
     def check_perm_s(func):
         async def perm_check(client, m):
-            if m.chat.type in ['bot', 'private']:
+            if m.chat.type in ["bot", "private"]:
                 return await func(client, m)
             if isinstance(perm_type, list):
                 s = {}
@@ -96,8 +98,10 @@ def iuser_check(func):
 
     return wrapper
 
+
 def log_errors(func):
     """Log exceptions."""
+
     @wraps(func)
     async def wrapper(*args, **kwargs):
         try:
@@ -115,7 +119,10 @@ def log_errors(func):
             raise ContinuePropagation from e
         except Exception as _be:
             try:
-                await Altruix.bot.send_message(Altruix.log_chat or Altruix.config.OWNER_ID, f"<b>AN ERROR OCCURRED:</b>\nException: <i>{_be}</i>\nOccurred in: <code>{func.__name__}</code>\n\n<code>{traceback.format_exc()}</code>")
+                await Altruix.bot.send_message(
+                    Altruix.log_chat or Altruix.config.OWNER_ID,
+                    f"<b>AN ERROR OCCURRED:</b>\nException: <i>{_be}</i>\nOccurred in: <code>{func.__name__}</code>\n\n<code>{traceback.format_exc()}</code>",
+                )
             except Exception as e:
                 raise _be from e
 

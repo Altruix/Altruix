@@ -8,12 +8,12 @@
 
 
 import re
-from typing import Optional
 import pyrogram
 from Main import Altruix
+from typing import Optional
 from platform import python_version
 from pyrogram import Client, filters
-from Main.core.decorators import iuser_check, log_errors
+from Main.core.decorators import log_errors, iuser_check
 from pyrogram.types import (
     InlineQuery, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
     InputTextMessageContent, InlineQueryResultArticle)
@@ -62,11 +62,12 @@ async def get_help_menu(return_all: bool = False):
                 if i.text == str(index + 1):
                     i.text = f"☞ {i.text} ☜"
             page.append(page_buttons)
-            page.append([InlineKeyboardButton('Close', 'close_help')])
+            page.append([InlineKeyboardButton("Close", "close_help")])
     cache_help_menu = buttons
     if multi_pages and not return_all:
         return cache_help_menu[0]
     return cache_help_menu
+
 
 @log_errors
 async def get_plugin_data(plugin: str, number: int = 0):
@@ -77,11 +78,17 @@ async def get_plugin_data(plugin: str, number: int = 0):
     return text, buttons
 
 
-@Altruix.bot.on_callback_query(filters.regex('close_help'))
+@Altruix.bot.on_callback_query(filters.regex("close_help"))
 @log_errors
 @iuser_check
 async def close_help(c: Client, cq: CallbackQuery):
-    await cq.edit_message_text('<b>Help Menu Closed 🔐</b>', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Re-Open', 're_open')]]))
+    await cq.edit_message_text(
+        "<b>Help Menu Closed 🔐</b>",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Re-Open", "re_open")]]
+        ),
+    )
+
 
 @Altruix.bot.on_inline_query(filters.regex("^change_lang", flags=re.IGNORECASE))
 @log_errors
@@ -148,7 +155,9 @@ async def help(_: Client, iq: InlineQuery):
                 InlineQueryResultArticle(
                     title=f"Help Module for {plugin}",
                     input_message_content=InputTextMessageContent(text),
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Goto help menu', 'help')]]),
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton("Goto help menu", "help")]]
+                    ),
                 )
             ]
         )
@@ -157,16 +166,21 @@ async def help(_: Client, iq: InlineQuery):
             results=[
                 InlineQueryResultArticle(
                     title="Plugin not found!",
-                    input_message_content=InputTextMessageContent(f"Help for {plugin} is not found!"),
-                )]
+                    input_message_content=InputTextMessageContent(
+                        f"Help for {plugin} is not found!"
+                    ),
+                )
+            ]
         )
 
-@Altruix.bot.on_callback_query(filters.regex('^re_open'))
+
+@Altruix.bot.on_callback_query(filters.regex("^re_open"))
 @log_errors
 @iuser_check
 async def re_help(c: Client, cq: CallbackQuery):
     buttons = await get_help_menu()
     await cq.edit_message_text(help_text, reply_markup=InlineKeyboardMarkup(buttons))
+
 
 @Altruix.bot.on_callback_query(filters.regex("^help"))
 @log_errors

@@ -6,8 +6,8 @@
 #
 # All rights reserved.
 
-from os import remove
 import os
+from os import remove
 from Main import Altruix
 from style import bullets
 from pyrogram import Client
@@ -52,7 +52,7 @@ async def set_chat_pic_cmd_handler(c: Client, m: Message):
     if m.reply_to_message:
         reply = m.reply_to_message
         if not reply.media:
-            
+
             return await msg.edit_msg("INVALID_REPLY")
         if reply.photo:
             file = reply.photo.file_id
@@ -64,10 +64,8 @@ async def set_chat_pic_cmd_handler(c: Client, m: Message):
             await c.set_chat_photo(m.chat.id, file)
         except Exception as be:
             name, err = await Paste(be).paste()
-            await msg.edit_msg(
-                Altruix.get_string("ERROR_"), string_args=(name, err)
-            )
-        return os.remove(file) if os.path.exists(file) else 'ok'
+            await msg.edit_msg(Altruix.get_string("ERROR_"), string_args=(name, err))
+        return os.remove(file) if os.path.exists(file) else "ok"
     else:
         await msg.edit_msg("REPLY_TO_MESSAGE")
 

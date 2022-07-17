@@ -68,7 +68,7 @@ async def bcast_remove(c: Client, m: Message):
         "help": "To broadcast the replied message",
         "example": "bcast <replyt_o_msg>",
     },
-    requires_reply=True
+    requires_reply=True,
 )
 async def broadcast(c: Client, m: Message):
     success = 0
@@ -76,12 +76,16 @@ async def broadcast(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     chats = []
     async for x in bcast_db.find({"client_id": c.myself.id}):
-        chats.append(x['chat_id'])
+        chats.append(x["chat_id"])
     if not chats:
         return await msg.edit("No chats saved in db")
     for chat in chats:
         try:
-            await c.copy_message(chat_id=int(chat), from_chat_id=m.chat.id, message_id=m.reply_to_message.id)
+            await c.copy_message(
+                chat_id=int(chat),
+                from_chat_id=m.chat.id,
+                message_id=m.reply_to_message.id,
+            )
             success += 1
         except Exception:
             Altruix.log()

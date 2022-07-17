@@ -10,7 +10,6 @@
 import os
 import asyncio
 from Main import Altruix
-from pyrogram.types import Dialog 
 from typing import Union
 from pyrogram import Client, raw
 from pyrogram.types import ChatMember
@@ -112,33 +111,53 @@ class CustomClientMethods:
         )
 
     async def fetch_chats(self: Client):
-        return [x async for x in self.get_dialogs() if (not x.chat.type.PRIVATE or not x.chat.type.BOT)]
+        return [
+            x
+            async for x in self.get_dialogs()
+            if (not x.chat.type.PRIVATE or not x.chat.type.BOT)
+        ]
 
     async def check_my_perm(self, msg, perm_type):
         my_id = self.myself.id
         chat = msg.chat
         u_args = msg.user_args
         if (
-            ("-no-cache" not in u_args) and Altruix.SELF_PERMISSION_CACHE.get(chat.id) and Altruix.SELF_PERMISSION_CACHE.get(chat.id).get(my_id)
+            ("-no-cache" not in u_args)
+            and Altruix.SELF_PERMISSION_CACHE.get(chat.id)
+            and Altruix.SELF_PERMISSION_CACHE.get(chat.id).get(my_id)
         ):
             perms_json = Altruix.SELF_PERMISSION_CACHE[chat.id][my_id]
         else:
             try:
-                c : Client = msg._client
+                c: Client = msg._client
                 ps: ChatMember = await c.get_chat_member(chat.id, my_id)
             except Exception:
                 return None, None
             perms_json = {
                 "chat": chat.id,
-                "can_delete_messages": True if ps.status.OWNER else ps.privileges.can_delete_messages,
-                "can_restrict_members": True if ps.status.OWNER else ps.privileges.can_restrict_members,
-                "can_promote_members": True if ps.status.OWNER else ps.privileges.can_promote_members,
-                "can_change_info": True if ps.status.OWNER else ps.privileges.can_change_info,
-                "can_invite_users": True if ps.status.OWNER else ps.privileges.can_invite_users,
-                "can_pin_messages": True if ps.status.OWNER else ps.privileges.can_pin_messages,
-                "can_manage_voice_chats": True if ps.status.OWNER else ps.privileges.can_manage_video_chats,
+                "can_delete_messages": True
+                if ps.status.OWNER
+                else ps.privileges.can_delete_messages,
+                "can_restrict_members": True
+                if ps.status.OWNER
+                else ps.privileges.can_restrict_members,
+                "can_promote_members": True
+                if ps.status.OWNER
+                else ps.privileges.can_promote_members,
+                "can_change_info": True
+                if ps.status.OWNER
+                else ps.privileges.can_change_info,
+                "can_invite_users": True
+                if ps.status.OWNER
+                else ps.privileges.can_invite_users,
+                "can_pin_messages": True
+                if ps.status.OWNER
+                else ps.privileges.can_pin_messages,
+                "can_manage_voice_chats": True
+                if ps.status.OWNER
+                else ps.privileges.can_manage_video_chats,
                 "is_anonymous": True if ps.status.OWNER else ps.privileges.is_anonymous,
-                "can_be_edited": ps.can_be_edited
+                "can_be_edited": ps.can_be_edited,
             }
             if not Altruix.SELF_PERMISSION_CACHE.get(chat.id):
                 Altruix.SELF_PERMISSION_CACHE[chat.id] = {}

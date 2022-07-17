@@ -12,8 +12,8 @@ from Main import Altruix
 from style import ping_format as pf
 from pyrogram import Client, filters
 from pyrogram.raw.functions import Ping
-from Main.core.decorators import iuser_check, log_errors
 from Main.utils.essentials import Essentials
+from Main.core.decorators import log_errors, iuser_check
 from pyrogram.types import (
     Message, InlineQuery, CallbackQuery, InlineKeyboardButton,
     InlineKeyboardMarkup, InputTextMessageContent, InlineQueryResultArticle)

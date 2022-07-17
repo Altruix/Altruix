@@ -11,7 +11,9 @@ import os
 import logging
 from ..utils.startup_helpers import custom_init
 
+
 logger = logging.getLogger(__name__)
+
 
 class Cache:
     def __init__(self, config, db, clients) -> None:

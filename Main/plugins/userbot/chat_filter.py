@@ -9,7 +9,6 @@
 import re
 from Main import Altruix
 from pyrogram import filters
-from Main.core.config import BaseConfig
 from Main.core.types.message import Message
 
 

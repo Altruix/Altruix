@@ -12,7 +12,7 @@ from Main import Altruix
 from style import ping_format as pf
 from pyrogram import Client, filters
 from Main.core.types.message import Message
-from Main.core.decorators import iuser_check, inline_check, log_errors
+from Main.core.decorators import log_errors, iuser_check, inline_check
 from pyrogram.types import (
     Message, InlineQuery, CallbackQuery, InlineKeyboardButton,
     InlineKeyboardMarkup, InputTextMessageContent, InlineQueryResultArticle)

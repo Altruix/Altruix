@@ -6,8 +6,6 @@
 #
 # All rights reserved.
 
-import contextlib
-from ..utils._updater import Updater
 import os
 import sys
 import glob
@@ -22,15 +20,17 @@ import logging
 import aiofiles
 import importlib
 import traceback
+import contextlib
 import multiprocessing
 from pathlib import Path
 from functools import wraps
-from datetime import datetime
 from Main.core.apm import APM
+from datetime import datetime
 from cachetools import TTLCache
 from traceback import format_exc
 from Main.core.cache import Cache
 from Main.utils.paste import Paste
+from ..utils._updater import Updater
 from pyrogram.session import Session
 from .config import Config, BaseConfig
 from ..utils.essentials import Essentials
@@ -44,7 +44,7 @@ from pyrogram.types import Message, CallbackQuery
 from typing import Any, Dict, List, Union, Optional
 from ..utils.multi_lang_helpers import get_all_files_in_path
 from pyrogram import (
-    Client, StopPropagation, ContinuePropagation, idle, enums, filters,
+    Client, StopPropagation, ContinuePropagation, idle, filters,
     __version__ as pyrogram_version)
 from pyrogram.errors.exceptions.bad_request_400 import (
     MessageEmpty, PeerIdInvalid, MessageTooLong, MessageIdInvalid,
@@ -118,10 +118,10 @@ class AltruixClient:
 
     @staticmethod
     def log(
-            message: Optional[str] = None,
-            level=logging.INFO,
-            logger: logging.Logger = logging.getLogger(__module__),
-        ) -> Optional[str]:
+        message: Optional[str] = None,
+        level=logging.INFO,
+        logger: logging.Logger = logging.getLogger(__module__),
+    ) -> Optional[str]:
         logger.log(level, message or traceback.format_exc())
         return message or traceback.format_exc()
 
@@ -137,10 +137,11 @@ class AltruixClient:
 
     async def resolve_dns(self):
         import dns.resolver
+
         try:
-            dns.resolver.resolve('www.google.com')
+            dns.resolver.resolve("www.google.com")
         except Exception:
-            self.log('Resolving DNS. Setting to : 8.8.8.8')
+            self.log("Resolving DNS. Setting to : 8.8.8.8")
             dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
             dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
 
@@ -232,11 +233,14 @@ class AltruixClient:
                 bot_mode_unsupported=bot_mode_unsupported,
             )
             return wrapper
+
         return decorator
-    
+
     async def update_on_startup(self):
         if self.config.UPDATE_ON_STARTUP:
-            updater_ = Updater(repo=self.config.REPO, branch="main", app_url=self.app_url_)
+            updater_ = Updater(
+                repo=self.config.REPO, branch="main", app_url=self.app_url_
+            )
             repo = await updater_.init_repo()
             up_rem = await updater_.create_remote_and_fetch(repo)
             await updater_.update_locally(up_rem, repo, None, self, True)
@@ -419,7 +423,7 @@ class AltruixClient:
                     "pm_only": pm_only,
                 }
             ]
-        elif cmd not in [x.get('cmd', '_') for x in self.cmd_list[file_name]]:
+        elif cmd not in [x.get("cmd", "_") for x in self.cmd_list[file_name]]:
             self.cmd_list[file_name].append(
                 {
                     "cmd": cmd,
@@ -460,7 +464,8 @@ class AltruixClient:
             self.bot.add_handler(MessageHandler(func_, filters=bot_f), group=group)
 
     async def _setup(self, restart=False, *args, **kwargs):
-        if not os.path.isdir("cache"): os.mkdir('cache')
+        if not os.path.isdir("cache"):
+            os.mkdir("cache")
         await self.setup_localization()
         self.sudo_cmd_handler = await self.config.get_env("SUDO_CMD_HANDLER") or "!"
         self.user_command_handler = await self.config.get_env("CMD_HANDLER") or "."
@@ -473,7 +478,11 @@ class AltruixClient:
             "true",
             "enable",
         }
-        self.auto_approve = str((await self.config.get_env('AUTOAPPROVE'))).lower() in {'yes', 'true', 'ok'}
+        self.auto_approve = str((await self.config.get_env("AUTOAPPROVE"))).lower() in {
+            "yes",
+            "true",
+            "ok",
+        }
         if not restart:
             await self.initialize_telegram_sessions(*args, **kwargs)
         await self.update_cache()
@@ -578,7 +587,7 @@ class AltruixClient:
                     self.log(
                         f"Session {count + 1} became unusable, please re-add the session using the assistant bot."
                     )
-                    popped = self.config.pop_session(count)
+                    self.config.pop_session(count)
                     # if not popped:
                     #   popped = self.config.SESSIONS[count]
                     await self.config.pop_element_from_list("SESSIONS", each)
@@ -612,7 +621,10 @@ class AltruixClient:
             )
 
     async def _restart(
-        self, soft=False, last_msg: Union[Message, CallbackQuery, None] = None, power_hard=False
+        self,
+        soft=False,
+        last_msg: Union[Message, CallbackQuery, None] = None,
+        power_hard=False,
     ):
         self.loaded_bot_cmds = False
         _start = time.perf_counter()

@@ -10,11 +10,10 @@ import os
 import aiofiles
 from Main import Altruix
 from logging import info
-from pyrogram import enums
-from pyrogram import Client
-from Main.core.config import TGLIMITS
 from Main.utils.paste import Paste
+from pyrogram import Client, enums
 from time import perf_counter as pc
+from Main.core.config import TGLIMITS
 from Main.core.types.message import Message
 from Main.utils.dev_func import eval_py, exec_terminal
 
@@ -78,13 +77,16 @@ async def evaluate_command_handler(c: Client, m: Message):
     if "-s" in user_args and Altruix.log_chat:
         if "-paste" in user_args:
             url = await Paste(final_output).paste()
-            msg = await c.send_message(Altruix.log_chat, f"{cmd_} \n<b>Pasted to :</b> {url}")
+            msg = await c.send_message(
+                Altruix.log_chat, f"{cmd_} \n<b>Pasted to :</b> {url}"
+            )
         elif "-file" in user_args or len(final_output) >= TGLIMITS.MESSAGE_TEXT:
             file_path = f"out_bash_{m.id}.txt"
             async with aiofiles.open(file_path, "w") as f:
                 await f.write(final_output)
             msg = await c.send_document(Altruix.log_chat, file_path, caption=cmd)
-            if os.path.exists(file_path): os.remove(file_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
         else:
             msg = await c.send_message(Altruix.log_chat, final_output)
         return await m.edit_msg(f"<b>OUTPUT :</b> <a href='{msg.link}'>VIEW</a>")
@@ -129,16 +131,19 @@ async def terminal(c: Client, m: Message):
     if "-s" in user_args and Altruix.log_chat:
         if "-paste" in user_args:
             url = await Paste(_out_text).paste()
-            msg = await c.send_message(Altruix.log_chat, f"{caption_} \n<b>Pasted to :</b> {url}")
+            msg = await c.send_message(
+                Altruix.log_chat, f"{caption_} \n<b>Pasted to :</b> {url}"
+            )
         elif "-file" in user_args or len(out_text) >= TGLIMITS.MESSAGE_TEXT:
             file_path = f"out_bash_{m.id}.txt"
             async with aiofiles.open(file_path, "w") as f:
                 await f.write(_out_text)
             msg = await c.send_document(Altruix.log_chat, file_path, caption=caption_)
-            if os.path.exists(file_path): os.remove(file_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
         else:
             msg = await c.send_message(Altruix.log_chat, _out_text)
-        return await m.edit_msg( f"<b>OUTPUT :</b> <a href='{msg.link}'>VIEW</a>")
+        return await m.edit_msg(f"<b>OUTPUT :</b> <a href='{msg.link}'>VIEW</a>")
     return await m.edit_msg(
         _out_text,
         force_paste="-paste" in user_args,
@@ -188,14 +193,17 @@ async def logs(c: Client, m: Message):
     if "-s" in log__args_ and Altruix.log_chat:
         msg = (
             await c.send_document(
-                Altruix.log_chat, log_file_, file_name="AltruiX_logs.txt", caption='LOGS of your Altruix Userbot.'
+                Altruix.log_chat,
+                log_file_,
+                file_name="AltruiX_logs.txt",
+                caption="LOGS of your Altruix Userbot.",
             )
             if "_paste" not in log__args_
-            else await c.send_message(
-                Altruix.log_chat, (await paste_logs(log_file_))
-            )
+            else await c.send_message(Altruix.log_chat, (await paste_logs(log_file_)))
         )
-        return await MSG.edit_msg(f"**LOGS HERE :** [VIEW]({msg.link})", parse_mode=enums.ParseMode.MARKDOWN)
+        return await MSG.edit_msg(
+            f"**LOGS HERE :** [VIEW]({msg.link})", parse_mode=enums.ParseMode.MARKDOWN
+        )
     if "_paste" in log__args_:
         return await MSG.edit_msg(await paste_logs(log_file_))
     msg = await c.send_document(

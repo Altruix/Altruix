@@ -40,7 +40,7 @@ async def add_blacklist_cmd_handler(c: Client, m: Message):
     warns = False
     if any("-w" in s for s in user_args):
         warns = [x for x in user_args if x.startswith("-w")][0][2:]
-        if warns == '' or not warns.isdigit():
+        if warns == "" or not warns.isdigit():
             return await m.handle_message("INVALID_BLACKLIST_SYNTAX")
         warns = int(warns)
     await bl_db.insert_one(
@@ -95,7 +95,9 @@ async def delete_blacklist_cmd_handler(c: Client, m: Message):
     ):
         await processing_msg.edit_msg("NOT_BLACKLISTED", string_args=(rmword))
         return ""
-    await bl_db.delete_one({"chat_id": m.chat.id, "bl_word": rmword, "client_id": my_id})
+    await bl_db.delete_one(
+        {"chat_id": m.chat.id, "bl_word": rmword, "client_id": my_id}
+    )
     await processing_msg.edit_msg("BL_REMOVE", string_args=(rmword))
 
 
@@ -108,7 +110,9 @@ async def blchat(filter, c: Client, m: Message):
 
 async def admin_or_sudo(c: Client, m: Message):
     status = (await c.get_chat_member(m.chat.id, m.from_user.id)).status
-    return bool(status.ADMINISTRATOR or status.OWNER or m.from_user.id in Altruix.auth_users)
+    return bool(
+        status.ADMINISTRATOR or status.OWNER or m.from_user.id in Altruix.auth_users
+    )
 
 
 @Altruix.on_message(

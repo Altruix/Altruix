@@ -151,7 +151,9 @@ class APM:
                     "Package install failed : This package requires apt with sudo permissions!",
                     40,
                 )
-        if os.path.exists(req_file_path) or (req_file_path := os.path.exists(os.path.join(to_unzip, "req.txt"))):
+        if os.path.exists(req_file_path) or (
+            req_file_path := os.path.exists(os.path.join(to_unzip, "req.txt"))
+        ):
             if msg:
                 await msg.edit_msg("INSTALLING_PACKAGE_REQUIREMENTS")
             await self.Altruix.run_cmd_async(

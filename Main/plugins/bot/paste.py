@@ -12,9 +12,9 @@ from Main import Altruix
 from pyrogram import filters
 from Main.utils.paste import Paste
 from Main.core.types.message import Message
-from Main.core.decorators import iuser_check, log_errors
 from Main.utils.essentials import Essentials
 from Main.utils.helpers import arrange_buttons
+from Main.core.decorators import log_errors, iuser_check
 from pyrogram.types import (
     InlineQuery, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
     InputTextMessageContent, InlineQueryResultArticle)

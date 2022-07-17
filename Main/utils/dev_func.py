@@ -7,19 +7,15 @@
 # All rights reserved.
 
 
-import asyncio
-import contextlib
-import re
-import shlex
 import sys
+import shlex
+import asyncio
 import traceback
-import subprocess
 from io import StringIO
 from Main import Altruix
 from pprint import pprint
 from pyrogram import Client
 from pyrogram.types import Message
-from .file_helpers import run_in_exc
 
 
 p = print
@@ -64,6 +60,7 @@ async def eval_py(client: Client, code: str, m: Message):
         evaluation = Altruix.get_string("NO_OUTPUT")
     return evaluation.strip()
 
+
 async def exec_terminal(command: str):
     success = True
     return_code = 0
@@ -71,13 +68,13 @@ async def exec_terminal(command: str):
     output = ""
     try:
         process = await asyncio.create_subprocess_exec(
-                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
+            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
         return_code = process.returncode
         stdout, stderr = await process.communicate()
         output += stdout.decode("utf-8").strip()
         if stderr:
-            output += ("\n" + stderr.decode("utf-8").strip())
+            output += "\n" + stderr.decode("utf-8").strip()
         success = True
     except Exception:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -85,6 +82,7 @@ async def exec_terminal(command: str):
         success = False
         output += errors[-1]
     return success, output, return_code
+
 
 Altruix.__setattr__("run_cmd", exec_terminal)
 Altruix.__setattr__("eval_py", eval_py)

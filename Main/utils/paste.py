@@ -6,11 +6,12 @@
 #
 # All rights reserved.
 
-from json import JSONDecodeError
 import httpx
 import random
 import contextlib
+from json import JSONDecodeError
 from typing import Set, List, Union
+
 
 class Paste:
     def __init__(

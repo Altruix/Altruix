@@ -6,13 +6,13 @@
 #
 # All rights reserved.
 
-from os import remove
 import os
+from os import remove
 from Main import Altruix
 from pyrogram import Client
 from Main.core.types.message import Message
-from pyrogram.raw.functions.account import CheckUsername, GetAuthorizations
 from pyrogram.raw.types import Authorization
+from pyrogram.raw.functions.account import CheckUsername, GetAuthorizations
 
 
 @Altruix.register_on_cmd(
@@ -80,6 +80,6 @@ async def set(c: Client, m: Message):
         sessions = (await c.invoke(GetAuthorizations())).authorizations
         text_ = f"<b>Sessions :</b> ({len(sessions)}) \n\n"
         for session in sessions:
-            session : Authorization = session
-            text_ += f'> <b>Device :</b> <code>{session.device_model} {session.platform} V{session.system_version}</code> \n<b>App :</b> <code>{session.app_name} V{session.app_version}</code> \n<b>Region :</b> <code>{session.country} - {session.region} ({session.ip})</code> \n\n'
+            session: Authorization = session
+            text_ += f"> <b>Device :</b> <code>{session.device_model} {session.platform} V{session.system_version}</code> \n<b>App :</b> <code>{session.app_name} V{session.app_version}</code> \n<b>Region :</b> <code>{session.country} - {session.region} ({session.ip})</code> \n\n"
         await m.handle_message(text_)

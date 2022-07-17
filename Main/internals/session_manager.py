@@ -9,9 +9,8 @@
 
 from Main import Altruix
 from pyrogram import filters
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
-
 from Main.core.decorators import log_errors
+from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 
 
 @Altruix.bot.on_message(filters.command("add", "/"))

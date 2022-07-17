@@ -61,17 +61,18 @@ async def gban(c: Client, m: Message):
         except Exception:
             err += 1
     await msg.edit_msg(
-            "GBANNED",
-            string_args=(
-                user_mention,
-                (len(chats) - err),
-                round(time.time() - start_time, 2),
-            ),
-        )
+        "GBANNED",
+        string_args=(
+            user_mention,
+            (len(chats) - err),
+            round(time.time() - start_time, 2),
+        ),
+    )
 
 
 @Altruix.register_on_cmd(
-    ["ungban"], cmd_help={"help": "To globally unban a user", "example": "ungban <userid>"}
+    ["ungban"],
+    cmd_help={"help": "To globally unban a user", "example": "ungban <userid>"},
 )
 async def ungban(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
@@ -106,11 +107,13 @@ async def ungban(c: Client, m: Message):
         except Exception:
             err += 1
     await msg.edit_msg(
-            "UNGBANNED",
-            string_args=(user_mention, err, len(chats), (len(chats) - err)),
-        )
+        "UNGBANNED",
+        string_args=(user_mention, err, len(chats), (len(chats) - err)),
+    )
+
 
 GBANNED_CACHE = {}
+
 
 async def check_gbanned(user_, my_id):
     if GBANNED_CACHE.get(my_id) and user_ in GBANNED_CACHE.get(my_id):
@@ -123,6 +126,7 @@ async def check_gbanned(user_, my_id):
         GBANNED_CACHE[my_id].append(user_)
     return bool(_checks_)
 
+
 def is_gbanned(func):
     @wraps(func)
     async def is_g_banned(c, m):
@@ -132,7 +136,9 @@ def is_gbanned(func):
             if await check_gbanned(user_, my_id):
                 return await func(c, m)
         return False
+
     return is_g_banned
+
 
 @Altruix.on_message((filters.group | filters.channel) & ~filters.private, group=2)
 @is_gbanned

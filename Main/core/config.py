@@ -23,23 +23,25 @@ from .exceptions import NoDatabaseConnected, EnvVariableTypeError
 
 dotenv.load_dotenv()
 
+
 def digit_wrap(digit):
     with contextlib.suppress(Exception):
         return int(digit)
     return digit
 
+
 class TGLIMITS(object):
-    # Accounts 
+    # Accounts
     MAX_USERNAME = 32
     MIN_USERNAME = 5
     FIRSTNAME = 64
     LASTNAME = 64
-    
+
     # Messages
     MESSAGE_TEXT = 4096
     MEDIA_CAPTION_TEXT = 1024
-    FILE_SIZE_LIMIT = 2 # GB
-    
+    FILE_SIZE_LIMIT = 2  # GB
+
 
 class BaseConfig(object):
     BOT_TOKEN = getenv("BOT_TOKEN")
@@ -60,7 +62,7 @@ class BaseConfig(object):
     HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
     HELP_MENU_ROWS = int(getenv("HELP_MENU_ROWS", 6))
     HELP_MENU_COLUMNS = int(getenv("HELP_MENU_COLUMNS", 3))
-    AUTOAPPROVE = getenv('AUTOAPPROVE', True)
+    AUTOAPPROVE = getenv("AUTOAPPROVE", True)
     DEFAULT_REPO = "https://github.com/Altruix/Altruix"
     HEROKU_API_KEY = getenv("HEROKU_API_KEY")
     REPO = getenv("CUSTOM_REPO") or DEFAULT_REPO
@@ -72,7 +74,11 @@ class BaseConfig(object):
 """
     APPROVED_DICT: dict = {}
     CUSTOM_PM_TEXT: dict = {}
-    UPDATE_ON_STARTUP = False if (getenv('UPDATE_ON_STARTUP', 'yes').lower() in ['n', 'nope', 'false']) else True
+    UPDATE_ON_STARTUP = (
+        False
+        if (getenv("UPDATE_ON_STARTUP", "yes").lower() in ["n", "nope", "false"])
+        else True
+    )
     CUSTOM_PM_MEDIA: dict = {}
     PM_WARNS_DICT: dict = {}
     DB_NAME = "mongo"
@@ -99,9 +105,9 @@ class BaseConfig(object):
         ]
     except Exception:
         raise EnvVariableTypeError(Exception)
-    
+
     ALIVE_MEDIA = getenv("ALIVE_MEDIA")
-    
+
     def pop_session(self, index: int) -> Optional[str]:
         if len(self.SESSIONS) == 0:
             raise Exception("No sessions to pop")
@@ -164,6 +170,7 @@ def var_check(func):
             return await func(*args, **kwargs)
         except Exception as e:
             raise EnvVariableTypeError(e) from e
+
     return var_check
 
 

@@ -6,13 +6,13 @@
 #
 # All rights reserved.
 
-import contextlib
 import os
 import re
 import uuid
 import psutil
 import socket
 import platform
+import contextlib
 from Main import Altruix
 from Main.utils.essentials import Essentials
 from telegraph import Telegraph, upload_file
@@ -80,7 +80,7 @@ async def sTATS(c: Altruix, m: Message):
     database_ = await Altruix.db._db_name.command("dbstats")
     s = ub_stat + (
         Essentials.humanbytes(database_["dataSize"]),
-        Essentials.humanbytes(database_.get('storageSize')),
+        Essentials.humanbytes(database_.get("storageSize")),
     )
     out_ = tuple(s)
     await msg.edit_msg("UBSTAT", string_args=out_)
