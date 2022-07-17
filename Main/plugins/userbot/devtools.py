@@ -39,7 +39,7 @@ async def get_json(c: Client, m: Message):
     cmd_ = "<b>jsonified</b>"
     await m_.edit_msg(
         jsonified,
-        force_paste="_paste" in user_args,
+        force_paste="-paste" in user_args,
         force_file=f"message.json;{cmd_}" if "-file" in user_args else None,
         reply_to_message_id=msg_id,
     )

@@ -60,7 +60,7 @@ async def get_help_menu(return_all: bool = False):
             ]
             for i in page_buttons:
                 if i.text == str(index + 1):
-                    i.text = f"☞ {i.text} ☜"
+                    i.text = f"> {i.text} <"
             page.append(page_buttons)
             page.append([InlineKeyboardButton("Close", "close_help")])
     cache_help_menu = buttons

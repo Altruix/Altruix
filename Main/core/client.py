@@ -40,7 +40,7 @@ from ..utils.custom_filters import user_filters
 from ..utils.startup_helpers import concatenate
 from Main.utils.heroku_ import prepare_heroku_url
 from concurrent.futures import ThreadPoolExecutor
-from pyrogram.types import Message, CallbackQuery
+from pyrogram.types import Message, CallbackQuery, User
 from typing import Any, Dict, List, Union, Optional
 from ..utils.multi_lang_helpers import get_all_files_in_path
 from pyrogram import (
@@ -190,12 +190,12 @@ class AltruixClient:
             )
         self.log("Localization setup complete!")
 
-    def get_string(self, keyword: str, args: tuple = None):
+    def get_string(self, keyword: str, default: str = None, args: tuple = None):    
         selected_lang = self.selected_lang
         if self.all_lang_strings.get(selected_lang) and self.all_lang_strings.get(
             selected_lang
         ).get(keyword):
-            str_ing = self.all_lang_strings.get(selected_lang).get(keyword)
+            str_ing = self.all_lang_strings.get(selected_lang).get(keyword)  or default
             return (
                 (
                     str_ing.format(*args)
@@ -539,7 +539,7 @@ class AltruixClient:
         )
         await self.bot.start()
         self.bot_info = await self.bot.get_me()
-        self.bot.myself = self.bot_info
+        self.bot.info = self.bot_info
         self.log(f"Assistant : Logged in as @{self.bot_info.username}")
         if string_sessions := self.config.SESSIONS:
             self.log("User session was found locally, syncing in progress...")
@@ -577,7 +577,7 @@ class AltruixClient:
                     ).start()
                     client.myself = await client.get_me()
                     self.clients.append(client)
-                    self.ourselves.append(client.myself)
+                    if not client.myself.id == self.config.OWNER_ID: self.ourselves.append(client.myself)
                     self.log(f"[{count + 1}/{len(string_sessions)}] Sessions Loaded.")
                 except Exception as err:
                     self.log(
@@ -595,7 +595,7 @@ class AltruixClient:
                 await self.config.del_env_from_db("SESSIONS")
                 self.traning_wheels_protocol = True
 
-    async def add_session(self, session: str, status: Message = None):
+    async def add_session(self, session: str, status: Message = None) -> Client:
         await self.config.add_element_to_list("SESSIONS", session)
         self.config.append_session(session)
         self.config.SESSIONS.append(session)
@@ -611,14 +611,28 @@ class AltruixClient:
         await app.start()
         session_user_info = await app.get_me()
         app.myself = session_user_info
-        self.ourselves.append(session_user_info)
+        if not app.myself.id == self.config.OWNER_ID: self.ourselves.append(session_user_info)
         self.traning_wheels_protocol = False
         await self.load_all_modules()
         self.log("Userbot plugins have been loaded.")
         if status:
             await status.edit(
-                "<b>Altruix have been successfully connected with your account!</b> \nPlease visit @AltruixUB for any support or help!",
+                "<b>Account Successfully added!</b>",
             )
+        return app
+
+
+    async def remove_session(self, index: int) -> User:
+        session = self.config.pop_session(index)
+        await self.config.pop_element_from_list("SESSIONS", session)
+        removed_session_info = self.ourselves.pop(index)
+        await self.clients.pop(index).stop()
+        if not self.ourselves:
+            self.traning_wheels_protocol = True
+            self.log("[TWP] has been enabled!")
+        self.log("User session removed successfully!")
+        self.loop.create_task(self.load_all_modules())
+        return removed_session_info
 
     async def _restart(
         self,
