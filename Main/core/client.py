@@ -117,8 +117,12 @@ class AltruixClient:
         )
 
     @staticmethod
-    def log(message: str = None, level=logging.INFO) -> None:
-        logging.log(level, message or traceback.format_exc())
+    def log(
+            message: Optional[str] = None,
+            level=logging.INFO,
+            logger: logging.Logger = logging.getLogger(__module__),
+        ) -> Optional[str]:
+        logger.log(level, message or traceback.format_exc())
         return message or traceback.format_exc()
 
     def _init_logger(self) -> None:
