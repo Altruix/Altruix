@@ -26,7 +26,7 @@ from Main.utils.essentials import Essentials
 async def alive(c: Client, m: Message):
     version = Altruix.__version__
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
-    path_ = "./custom_files/alive.*"
+    path_ = "./cache/alive.*"
     file = glob.glob(path_)[0] if glob.glob(path_) else ''
     if os.path.exists(file):
         await m.reply_file(

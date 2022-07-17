@@ -20,7 +20,7 @@ from pyrogram.types import (
 
 @Altruix.bot.on_message(filters.command("start", "/"))
 async def start_command_handler(_, m: Message):
-    path_ = "./custom_files/bot_st_media.*"
+    path_ = "./cache/bot_st_media.*"
     file = glob.glob(path_)[0] if glob.glob(path_) else "./Main/assets/images/logo.jpg"
     await m.reply_file(
         file,

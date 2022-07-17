@@ -8,8 +8,10 @@
 
 
 import os
+import logging
 from ..utils.startup_helpers import custom_init
 
+logger = logging.getLogger(__name__)
 
 class Cache:
     def __init__(self, config, db, clients) -> None:
@@ -42,9 +44,10 @@ class Cache:
                 self.config.PM_WARNS_DICT[client.myself.id] = int(pm_limit_)
 
     async def init_all_custom_files(self):
-        path_ = "./custom_files/"
+        path_ = "./cache/"
         if not os.path.exists(path_):
             os.makedirs(path_)
+            logger.info("Created cache directory")
         if alive_media := await self.config.get_env("ALIVE_MEDIA"):
             await custom_init(alive_media, suffix_file="alive", to_path=path_)
         if pm_media := await self.config.get_env("PM_MEDIA"):

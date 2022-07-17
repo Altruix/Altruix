@@ -456,6 +456,7 @@ class AltruixClient:
             self.bot.add_handler(MessageHandler(func_, filters=bot_f), group=group)
 
     async def _setup(self, restart=False, *args, **kwargs):
+        if not os.path.isdir("cache"): os.mkdir('cache')
         await self.setup_localization()
         self.sudo_cmd_handler = await self.config.get_env("SUDO_CMD_HANDLER") or "!"
         self.user_command_handler = await self.config.get_env("CMD_HANDLER") or "."
@@ -518,6 +519,7 @@ class AltruixClient:
             api_id=self.config.API_ID,
             api_hash=self.config.API_HASH,
             bot_token=self.config.BOT_TOKEN,
+            workdir="cache",
             *args,
             **kwargs,
         )
@@ -559,6 +561,7 @@ class AltruixClient:
                         api_id=self.config.API_ID,
                         api_hash=self.config.API_HASH,
                         session_string=each,
+                        workdir="cache",
                     ).start()
                     client.myself = await client.get_me()
                     self.clients.append(client)
@@ -588,10 +591,11 @@ class AltruixClient:
         if self.traning_wheels_protocol:
             self.log("[TWP] has been disabled!")
         app = Client(
-            "1_instance",
+            "main_instance",
             api_id=self.config.API_ID,
             api_hash=self.config.API_HASH,
             session_string=session,
+            workdir="cache",
         )
         self.clients.append(app)
         await app.start()
