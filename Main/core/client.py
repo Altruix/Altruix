@@ -190,12 +190,12 @@ class AltruixClient:
             )
         self.log("Localization setup complete!")
 
-    def get_string(self, keyword: str, default: str = None, args: tuple = None):
+    def get_string(self, keyword: str, args: tuple = None):
         selected_lang = self.selected_lang
         if self.all_lang_strings.get(selected_lang) and self.all_lang_strings.get(
             selected_lang
         ).get(keyword):
-            str_ing = self.all_lang_strings.get(selected_lang).get(keyword) or default
+            str_ing = self.all_lang_strings.get(selected_lang).get(keyword)
             return (
                 (
                     str_ing.format(*args)
@@ -823,8 +823,8 @@ class AltruixClient:
                     for arg in user_args:
                         arg_ = arg
                         if not arg.startswith("-"):
-                            arg_ = f"-{arg}"
-                        self.CLIST[cmd] += f">> <code>{arg_}: {user_args[arg]}</code>\n"
+                            arg_ = f"<code>-{arg}</code>"
+                        self.CLIST[cmd] += f">> {arg_}: {user_args[arg]}\n"
                 if cmds.get("requires_input"):
                     self.CLIST[cmd] += f"\n<b>Input Req:</b> <code>Yes</code>"
                 if cmds.get("requires_reply"):
