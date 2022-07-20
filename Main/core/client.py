@@ -572,6 +572,8 @@ class AltruixClient:
                 try:
                     client = await Client(
                         f"{count}_instance_Altruix",
+                        api_id=self.config.API_ID,
+                        api_hash=self.config.API_HASH,
                         session_string=each,
                         workdir="cache",
                     ).start()
@@ -605,6 +607,8 @@ class AltruixClient:
             self.log("[TWP] has been disabled!")
         app = Client(
             "main_instance",
+            api_id=self.config.API_ID,
+            api_hash=self.config.API_HASH,
             session_string=session,
             workdir="cache",
         )
