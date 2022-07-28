@@ -39,8 +39,8 @@ class CustomClientMethods:
             except (FloodWait, SlowmodeWait) as e:
                 if max_count > mmax_:
                     raise e
-                Altruix.log(f"[{e.__class__.__name__}]: sleeping for - {e.x + 3}s.")
-                await asyncio.sleep(e.x + 3)
+                Altruix.log(f"[{e.__class__.__name__}]: sleeping for - {e + 3}s.")
+                await asyncio.sleep(e + 3)
                 max_count += 1
 
     async def send_file(
