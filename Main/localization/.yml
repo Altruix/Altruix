@@ -1,4 +1,4 @@
-language: : template
+language: template
 
 404_FILE_NOT_FOUND: ""
 ADDED_SUDO: ""
