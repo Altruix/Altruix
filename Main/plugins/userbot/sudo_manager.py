@@ -94,10 +94,8 @@ async def add_sudo_func(c: Client, m: Message):
     cmd_help={
         "help": "remove sudo from sudo list, requires a restart to reflect the changes",
         "example": "rmsudo @warner_stark",
-        "user_args": {
-            "a": "removes all sudos from the db."
-        }
-    }
+        "user_args": {"a": "removes all sudos from the db."},
+    },
 )
 async def rm_sudo_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
@@ -105,12 +103,13 @@ async def rm_sudo_func(c: Client, m: Message):
     acg = await Altruix.config.get_sudo()
     if user_args := m.user_args:
         if "-a" in user_args:
-            count = 0; lacg = len(acg)
+            count = 0
+            lacg = len(acg)
             for i in acg:
                 try:
                     await Altruix.config.del_sudo(i)
                     count += 1
-                except:
+                except BaseException:
                     pass
             return await msg.edit_msg("DEL_SUDO_A", string_args=(count, lacg))
     if not user or is_channel:
@@ -126,10 +125,7 @@ async def rm_sudo_func(c: Client, m: Message):
 
 
 @Altruix.register_on_cmd(
-    "listsudo", cmd_help = {
-        "help": "list all sudo users!",
-        "example": "listsudo"
-        }
+    "listsudo", cmd_help={"help": "list all sudo users!", "example": "listsudo"}
 )
 async def add_sudo_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
