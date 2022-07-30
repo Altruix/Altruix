@@ -40,7 +40,7 @@ class CustomClientMethods:
                 if max_count > mmax_:
                     raise e
                 Altruix.log(f"[{e.__class__.__name__}]: sleeping for - {e.x + 3}s.")
-                await asyncio.sleep(e.x + 3)
+                await asyncio.sleep(e.value + 3)
                 max_count += 1
 
     async def send_file(

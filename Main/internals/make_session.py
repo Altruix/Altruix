@@ -74,7 +74,7 @@ async def add_session_cb_handler(_, cb: CallbackQuery):
         sent_code = await app.send_code(phone_number)
     except FloodWait as e:
         await process_msg.reply(
-            f"Couldn't create a session!.\nYou have a floodwait of <code>{e.x} seconds</code>."
+            f"Couldn't create a session!.\nYou have a floodwait of <code>{e.value} seconds</code>."
         )
         await process_msg.delete()
         return
