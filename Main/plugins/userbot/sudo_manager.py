@@ -76,7 +76,7 @@ async def remove_disabled_ps_func(c: Client, m: Message):
 )
 async def add_sudo_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
-    user, reason, is_channel = m.get_user
+    user, _, is_channel = m.get_user
     if not user or is_channel:
         return await msg.edit_msg("INVALID_USER")
     try:
@@ -94,25 +94,42 @@ async def add_sudo_func(c: Client, m: Message):
     cmd_help={
         "help": "remove sudo from sudo list, requires a restart to reflect the changes",
         "example": "rmsudo @warner_stark",
-    },
+        "user_args": {
+            "a": "removes all sudos from the db."
+        }
+    }
 )
-async def add_sudo_func(c: Client, m: Message):
+async def rm_sudo_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     user, _, is_channel = m.get_user
+    acg = await Altruix.config.get_sudo()
+    if user_args := m.user_args:
+        if "-a" in user_args:
+            count = 0; lacg = len(acg)
+            for i in acg:
+                try:
+                    await Altruix.config.del_sudo(i)
+                    count += 1
+                except:
+                    pass
+            return await msg.edit_msg("DEL_SUDO_A", string_args=(count, lacg))
     if not user or is_channel:
         return await msg.edit_msg("INVALID_USER")
     try:
         user_id = await c.get_users(user)
     except Exception:
         return await msg.edit_msg("INVALID_USER")
-    if user_id.id not in (await Altruix.config.get_sudo()):
+    if user_id.id not in acg:
         return await msg.edit_msg("NOT_IN_SUDO")
     await Altruix.config.del_sudo(user_id.id)
     await msg.edit_msg("DEL_SUDO", string_args=(user_id.mention))
 
 
 @Altruix.register_on_cmd(
-    "listsudo", cmd_help={"help": "list all sudo users!", "example": "listsudo"}
+    "listsudo", cmd_help = {
+        "help": "list all sudo users!",
+        "example": "listsudo"
+        }
 )
 async def add_sudo_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
