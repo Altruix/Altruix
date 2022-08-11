@@ -75,7 +75,7 @@ activate_venv_and_install_pip_packages () {
         pip install wheel && pkg install libjpeg-turbo && LDFLAGS="-L/system/lib/" CFLAGS="-I/data/data/com.termux/files/usr/include/" pip install Pillow
     fi
     pip3 install --upgrade pip || sudo pip3 install --upgrade pip
-    pip3 install -r -U requirements.txt || sudo pip3 install -r requirements.txt
+    pip3 install -U -r requirements.txt || sudo pip3 install -U -r requirements.txt
     python3 -m Main || sudo python3 -m Main
 }
 
