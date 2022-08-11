@@ -95,6 +95,7 @@ main () {
         run_altruix
     else
         echo -e "ERROR: .env file not found! After creating .env file start the userbot with, \npython3 -m Main"
+        exit 1
     fi
 }
 
