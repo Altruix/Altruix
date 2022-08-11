@@ -69,19 +69,33 @@ install_all_packages () {
 }
 
 activate_venv_and_install_pip_packages () {
+    echo -e "Activating python virtual environment... \n"
     python3 -m venv $ALTRUIX_VENV || sudo python3 -m venv $ALTRUIX_VENV
     source $ALTRUIX_VENV/bin/activate
     if [ "$on_termux" == "True" ]; then
         pip install wheel && pkg install libjpeg-turbo && LDFLAGS="-L/system/lib/" CFLAGS="-I/data/data/com.termux/files/usr/include/" pip install Pillow
     fi
+    echo -e "Installing python dependencies using pip... \n"
     pip3 install --upgrade pip || sudo pip3 install --upgrade pip
     pip3 install -U -r requirements.txt || sudo pip3 install -U -r requirements.txt
+}
+
+run_altruix() {
     python3 -m Main || sudo python3 -m Main
 }
 
-run () {
+
+main () {
+    # Install packages
     install_all_packages
+    # Activate python venv and instlall pip packages
     activate_venv_and_install_pip_packages
+    # Check if config file exists
+    if [ -f ".env" ]; then
+        run_altruix
+    else
+        echo -e "ERROR: .env file not found! After creating .env file start the userbot with, \npython3 -m Main"
+    fi
 }
 
-run
+main
