@@ -28,11 +28,12 @@ fi
 }
 
 package_check () {
-if [ $(dpkg-query -W -f='${Status}' $1 2>/dev/null | grep -c "ok installed") -eq 0 ];
-then
-  echo "Package $1 not found. Installing package $1"
-  install_package "$1"   
-fi
+    PACK=$(command -v "$1" &> /dev/null)
+    if ! $PACK;
+    then
+        echo "Package $1 not found. Installing package $1"
+    install_package "$1"   
+    fi
 }
 
 install_all_packages () {
