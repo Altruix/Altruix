@@ -60,7 +60,7 @@ package_check () {
 }
 
 install_all_packages () {
-    echo "Checking and installing Required packages...."
+    echo -e "[+] Checking and installing Required packages... \n"
     package_check 'python3'
     package_check 'ffmpeg'
     if [ "$on_termux" == "True" ]; then
@@ -69,13 +69,13 @@ install_all_packages () {
 }
 
 activate_venv_and_install_pip_packages () {
-    echo -e "Activating python virtual environment... \n"
+    echo -e "[+] Activating python virtual environment... \n"
     python3 -m venv $ALTRUIX_VENV || sudo python3 -m venv $ALTRUIX_VENV
     source $ALTRUIX_VENV/bin/activate
     if [ "$on_termux" == "True" ]; then
         pip install wheel && pkg install libjpeg-turbo && LDFLAGS="-L/system/lib/" CFLAGS="-I/data/data/com.termux/files/usr/include/" pip install Pillow
     fi
-    echo -e "Installing python dependencies using pip... \n"
+    echo -e "[+] Installing python dependencies using pip... \n"
     pip3 install --upgrade pip || sudo pip3 install --upgrade pip
     pip3 install -U -r requirements.txt || sudo pip3 install -U -r requirements.txt
 }
@@ -94,7 +94,7 @@ main () {
     if [ -f ".env" ]; then
         run_altruix
     else
-        echo -e "ERROR: .env file not found! After creating .env file start the userbot with, \npython3 -m Main"
+        echo -e "ERROR: .env file not found! After creating .env file start the userbot with, \n python3 -m Main"
         exit 1
     fi
 }
