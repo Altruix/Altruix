@@ -8,6 +8,10 @@ pm[/etc/SuSE-release]=zypp
 pm[/etc/debian_version]=apt-get
 pm[/etc/alpine-release]=apk
 
+# Vir
+ALTRUIX_VENV="Altruix"
+
+
 if [ $(echo $PREFIX | grep -o 'com.termux') ];then
     on_termux=True
 else
@@ -42,19 +46,19 @@ install_all_packages () {
     echo "Checking and installing Required packages...."
     package_check 'python3'
     package_check 'ffmpeg'
-    if [ "$on_termux" == "False" ]; then
+    if [ "$on_termux" == "True" ]; then
         package_check 'python3-venv'
     fi
 }
 
 activate_venv_and_install_pip_packages () {
-    python3 -m venv venv || sudo python3 -m venv venv
-    source venv/bin/activate
+    python3 -m venv $ALTRUIX_VENV || sudo python3 -m venv $ALTRUIX_VENV
+    source $ALTRUIX_VENV/bin/activate
     if [ "$on_termux" == "True" ]; then
         pip install wheel && pkg install libjpeg-turbo && LDFLAGS="-L/system/lib/" CFLAGS="-I/data/data/com.termux/files/usr/include/" pip install Pillow
     fi
     pip3 install --upgrade pip || sudo pip3 install --upgrade pip
-    pip3 install -r requirements.txt || sudo pip3 install -r requirements.txt
+    pip3 install -r -U requirements.txt || sudo pip3 install -r requirements.txt
     python3 -m Main || sudo python3 -m Main
 }
 
