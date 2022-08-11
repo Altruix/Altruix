@@ -1,3 +1,5 @@
+#! /usr/bin/bash
+
 declare -A pm;
 pm[/etc/redhat-release]=yum
 pm[/etc/arch-release]=pacman
@@ -18,8 +20,8 @@ install_package () {
             do
                 if [[ -f $f ]];then
                     echo "Using : [${pm[$f]}] to install packages"
-                    sudo ${pm[$f]} install "$1" -y || ${pm[$f]} install "$1" -y
-                    fi
+                    ${pm[$f]} install "$1" -y || sudo ${pm[$f]} install "$1" -y
+                fi
             done    }
     else
         echo "Using : [pkg] to install packages"
@@ -46,14 +48,14 @@ install_all_packages () {
 }
 
 activate_venv_and_install_pip_packages () {
-    sudo python3 -m venv venv || python3 -m venv venv
+    python3 -m venv venv || sudo python3 -m venv venv
     source venv/bin/activate
     if [ "$on_termux" == "True" ]; then
         pip install wheel && pkg install libjpeg-turbo && LDFLAGS="-L/system/lib/" CFLAGS="-I/data/data/com.termux/files/usr/include/" pip install Pillow
     fi
-    sudo pip3 install --upgrade pip || pip3 install --upgrade pip
-    sudo pip3 install -r requirements.txt || pip3 install -r requirements.txt
-    sudo python3 -m Main || python3 -m Main
+    pip3 install --upgrade pip || sudo pip3 install --upgrade pip
+    pip3 install -r requirements.txt || sudo pip3 install -r requirements.txt
+    python3 -m Main || sudo python3 -m Main
 }
 
 run () {
