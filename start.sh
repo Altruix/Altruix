@@ -1,17 +1,9 @@
 #! /usr/bin/bash
 
-declare -A pm;
-pm[/etc/redhat-release]=yum
-pm[/etc/arch-release]=pacman
-pm[/etc/gentoo-release]=emerge
-pm[/etc/SuSE-release]=zypp
-pm[/etc/debian_version]=apt-get
-pm[/etc/alpine-release]=apk
-
-# Vir
+# Constants
 ALTRUIX_VENV="Altruix"
 
-
+# Termux check
 if [ $(echo $PREFIX | grep -o 'com.termux') ];then
     on_termux=True
 else
@@ -20,15 +12,24 @@ fi
 
 install_package () {
     if [ "$on_termux" == "False" ]; then
-        { for f in ${!pm[@]}  
-            do
-                if [[ -f $f ]];then
-                    echo "Using : [${pm[$f]}] to install packages"
-                    ${pm[$f]} install "$1" -y || sudo ${pm[$f]} install "$1" -y
-                fi
-            done    }
+        if package_check "apt"; then
+            apt install $1 || sudo apt install $1
+        elif package_check "apt-get"; then
+            apt-get install $1 || sudo apt-get install $1
+        elif package_check "pacman"; then
+            pacman -S $1 || sudo pacman -S $1
+        elif package_check "yum"; then
+            yum install $1 || sudo yum install $1
+        elif package_check "apk"; then
+            apk add $1 || sudo apk add $1
+        elif package_check "zypper"; then
+            zypper install $1 || sudo zypper install $1
+        else
+            echo "Unable to install $1. No compatible package manager found!"
+            exit 1
+        fi
     else
-        echo "Using : [pkg] to install packages"
+        echo "Using: [pkg] to install packages"
         pkg install "$1" -y 
 fi
 }
@@ -37,7 +38,7 @@ package_check () {
     PACK=$(command -v "$1" &> /dev/null)
     if ! $PACK;
     then
-        echo "Package $1 not found. Installing package $1"
+        echo "Package $1 not found"
     install_package "$1"   
     fi
 }
