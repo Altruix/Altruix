@@ -11,30 +11,30 @@ else
 fi
 
 
-install_package () {
+install_package() {
     if [ "$on_termux" == "False" ]; then
         # Apt
-        if package_check "apt" -v; then
+        if package_check "apt"; then
             echo " >> Using: [apt] to install $1"
             apt install "$1" || sudo apt install "$1"
         # Apt-get
-        elif package_check "apt-get" -v; then
+        elif package_check "apt-get"; then
             echo " >> Using: [apt-get] to install $1"
             apt-get install "$1" || sudo apt-get install "$1"
         # Pacman
-        elif package_check "pacman" -v; then
+        elif package_check "pacman"; then
             echo " >> Using: [pacman] to install $1"
             pacman -S "$1" || sudo pacman -S "$1"
         # Yum
-        elif package_check "yum" -v; then
+        elif package_check "yum"; then
             echo " >> Using: [yum] to install $1"
             yum install "$1" || sudo yum install "$1"
         # Apk
-        elif package_check "apk" -v; then
+        elif package_check "apk"; then
             echo " >> Using: [apk] to install $1"
             apk add "$1" || sudo apk add "$1"
         # Zypper
-        elif package_check "zypper" -v; then
+        elif package_check "zypper"; then
             echo " >> Using: [zypper] to install $1"
             zypper install "$1" || sudo zypper install "$1"
         else
@@ -47,19 +47,15 @@ install_package () {
     fi
 }
 
-package_check () {
-    if [ "$2" == -v ]; then
-        PACK=$(command -v "$1")
-    else
-        PACK=$(command -v "$1" &> /dev/null)
-    fi
+package_check() {
+    PACK=$(command -v "$1" &> /dev/null)
     if ! $PACK; then
         echo "INFO: Package $1 not found"
         install_package "$1"   
     fi
 }
 
-install_all_packages () {
+install_all_packages() {
     echo -e "[+] Checking and installing Required packages... \n"
     package_check 'python3'
     package_check 'ffmpeg'
@@ -68,7 +64,7 @@ install_all_packages () {
     fi
 }
 
-activate_venv_and_install_pip_packages () {
+activate_venv_and_install_pip_packages() {
     echo -e "[+] Activating python virtual environment... \n"
     python3 -m venv $ALTRUIX_VENV || sudo python3 -m venv $ALTRUIX_VENV
     source $ALTRUIX_VENV/bin/activate
@@ -85,7 +81,7 @@ run_altruix() {
 }
 
 
-main () {
+main() {
     # Install packages
     install_all_packages
     # Activate python venv and instlall pip packages
