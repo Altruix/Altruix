@@ -10,6 +10,7 @@ else
     on_termux=False  
 fi
 
+
 install_package () {
     if [ "$on_termux" == "False" ]; then
         # Apt
@@ -37,7 +38,7 @@ install_package () {
             echo " >> Using: [zypper] to install $1"
             zypper install "$1" || sudo zypper install "$1"
         else
-            echo "Unable to install $1. No compatible package manager found!"
+            echo "ERROR: Unable to install $1. No compatible package manager found!"
             exit 1
         fi
     else
@@ -52,10 +53,9 @@ package_check () {
     else
         PACK=$(command -v "$1" &> /dev/null)
     fi
-    if ! $PACK;
-    then
-        echo "Package $1 not found"
-    install_package "$1"   
+    if ! $PACK; then
+        echo "INFO: Package $1 not found"
+        install_package "$1"   
     fi
 }
 
