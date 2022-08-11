@@ -12,30 +12,46 @@ fi
 
 install_package () {
     if [ "$on_termux" == "False" ]; then
-        if package_check "apt"; then
-            apt install $1 || sudo apt install $1
-        elif package_check "apt-get"; then
-            apt-get install $1 || sudo apt-get install $1
-        elif package_check "pacman"; then
-            pacman -S $1 || sudo pacman -S $1
-        elif package_check "yum"; then
-            yum install $1 || sudo yum install $1
-        elif package_check "apk"; then
-            apk add $1 || sudo apk add $1
-        elif package_check "zypper"; then
-            zypper install $1 || sudo zypper install $1
+        # Apt
+        if package_check "apt" -v; then
+            echo " >> Using: [apt] to install $1"
+            apt install "$1" || sudo apt install "$1"
+        # Apt-get
+        elif package_check "apt-get" -v; then
+            echo " >> Using: [apt-get] to install $1"
+            apt-get install "$1" || sudo apt-get install "$1"
+        # Pacman
+        elif package_check "pacman" -v; then
+            echo " >> Using: [pacman] to install $1"
+            pacman -S "$1" || sudo pacman -S "$1"
+        # Yum
+        elif package_check "yum" -v; then
+            echo " >> Using: [yum] to install $1"
+            yum install "$1" || sudo yum install "$1"
+        # Apk
+        elif package_check "apk" -v; then
+            echo " >> Using: [apk] to install $1"
+            apk add "$1" || sudo apk add "$1"
+        # Zypper
+        elif package_check "zypper" -v; then
+            echo " >> Using: [zypper] to install $1"
+            zypper install "$1" || sudo zypper install "$1"
         else
             echo "Unable to install $1. No compatible package manager found!"
             exit 1
         fi
     else
-        echo "Using: [pkg] to install packages"
+        echo "Using: [pkg] to install $1"
         pkg install "$1" -y 
-fi
+    fi
 }
 
 package_check () {
-    PACK=$(command -v "$1" &> /dev/null)
+    if [ "$2" == -v ]; then
+        PACK=$(command -v "$1")
+    else
+        PACK=$(command -v "$1" &> /dev/null)
+    fi
     if ! $PACK;
     then
         echo "Package $1 not found"
