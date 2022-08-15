@@ -32,7 +32,14 @@ fi
 run_scripts () {
     detected_os
     echo "OS [$name] Detected. Running $file script.."
-    bash $file
+    if [[ ! -d "./Main" ]]
+    then
+        echo "Repo Not found in the script path. Using Git to clone..."
+        bash $file -install
+    else
+        echo "OS [$name] Detected. Running $file script.."
+        bash $file
+    fi
 }
 
 

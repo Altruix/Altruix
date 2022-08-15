@@ -1,5 +1,13 @@
 #!/bin/bash
 
+
+MAIN_URL='https://github.com/Altruix/Altruix'
+if [ '-install' == $1 ]; then
+    clone_main_repo=true
+else
+    clone_main_repo=false
+fi
+
 _isInstalled() {
     package="$1";
     check="$(sudo pacman -Qs --color always "${package}" | grep "local" | grep "${package} ")";
@@ -30,6 +38,10 @@ _installMany() {
 }
 
 final_run () {
+    if [ clone_main_repo == 'true' ]; then
+        _installMany git
+        git clone $MAIN_URL
+    fi
     _installMany python3 ffmpeg python-pip # install these arch packages.
     python3 -m venv venv
     source venv/bin/activate

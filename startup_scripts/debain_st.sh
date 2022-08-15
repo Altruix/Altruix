@@ -1,5 +1,12 @@
 # !/bin/bash
 
+MAIN_URL='https://github.com/Altruix/Altruix'
+if [ '-install' == $1 ]; then
+    clone_main_repo=true
+else
+    clone_main_repo=false
+fi
+
 _isInstalled() {
     package="$1";
     if [ $(dpkg-query -W -f='${Status}' $1 2>/dev/null | grep -c "ok installed") ];
@@ -30,6 +37,10 @@ _installMany() {
 
 
 final_run () {
+    if [ clone_main_repo == 'true' ]; then
+        _installMany git
+        git clone $MAIN_URL
+    fi
     _installMany python3 ffmpeg python3-pip # install these debain packages
     python3 -m venv venv
     source venv/bin/activate
