@@ -62,7 +62,7 @@ async def unpin(c: Client, msg: Message):
 @check_perm("can_restrict_members")
 async def ban(c: Client, m: Message):
     ms = await m.handle_message("PROCESSING")
-    user_, reason_, is_chnnl = m.get_user
+    user_, reason_, _ = m.get_user
     if not user_:
         return await ms.edit_msg("INVALID_USER")
     dur, input_dur = m.extract_time
@@ -283,6 +283,24 @@ async def promote(c: Client, m: Message):
     user_info = await c.get_users(user_)
     await ms.edit_msg("DEMOTED", string_args=(user_info.mention))
 
+@Altruix.register_on_cmd(
+    ["del", "delete"],
+    cmd_help={
+        "help": "Delete the replied message",
+        "example": "del <reply to message>",
+    },
+    requires_reply=True
+)
+async def delete(c: Client, m:Message):
+    start_time = time.time()
+    ms = await m.handle_message("PROCESSING")
+    status = await c.delete_messages(chat_id=m.chat.id, message_ids=m.reply_to_message.id)
+    if status:
+        await ms.edit_msg("DEL_SUCCESS_TRUE", string_args=(round((time.time() - start_time) * 1000, 2)))
+    else:
+        await ms.edit_msg("DEL_SUCCESS_FALSE")
+    time.sleep(3)
+    await ms.delete()
 
 @Altruix.register_on_cmd(
     "purge",
@@ -310,5 +328,5 @@ async def purge(c: Client, m: Message):
     end_time = time.time()
     time_taken = round((end_time - start_time) * 1000, 2)
     await ms.edit_msg("PURGED", string_args=(time_taken, no_of_msg_purged))
-    time.sleep(5)
+    time.sleep(3)
     await ms.delete()
