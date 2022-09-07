@@ -15,13 +15,12 @@ import platform
 import contextlib
 from Main import Altruix
 from Main.utils.essentials import Essentials
-from telegraph import Telegraph, upload_file
 from pyrogram.types.messages_and_media.message import Message
 
 
-#telegraph = Telegraph()
-#res = telegraph.create_account(short_name="Altruix")
-#auth_url = res["auth_url"]
+# telegraph = Telegraph()
+# res = telegraph.create_account(short_name="Altruix")
+# auth_url = res["auth_url"]
 
 
 @Altruix.run_in_exc
@@ -86,15 +85,15 @@ async def sTATS(c: Altruix, m: Message):
     await msg.edit_msg("UBSTAT", string_args=out_)
 
 
-#@Altruix.register_on_cmd(
+# @Altruix.register_on_cmd(
 #    ["telegraph", "tg"],
 #    cmd_help={
 #        "help": "upload files to telegraph",
 #        "cmd_help": "telgraph <reply to media>",
 #    },
 #    requires_reply=True,
-#)
-#async def download_files_from_telegram(c, m):
+# )
+# async def download_files_from_telegram(c, m):
 #    msg = await m.handle_message("PROCESSING")
 #    if not m.reply_to_message.media:
 #        return await msg.edit_msg("REPLY_TO_FILE")

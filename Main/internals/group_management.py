@@ -283,24 +283,31 @@ async def promote(c: Client, m: Message):
     user_info = await c.get_users(user_)
     await ms.edit_msg("DEMOTED", string_args=(user_info.mention))
 
+
 @Altruix.register_on_cmd(
     ["del", "delete"],
     cmd_help={
         "help": "Delete the replied message",
         "example": "del <reply to message>",
     },
-    requires_reply=True
+    requires_reply=True,
 )
-async def delete(c: Client, m:Message):
+async def delete(c: Client, m: Message):
     start_time = time.time()
     ms = await m.handle_message("PROCESSING")
-    status = await c.delete_messages(chat_id=m.chat.id, message_ids=m.reply_to_message.id)
+    status = await c.delete_messages(
+        chat_id=m.chat.id, message_ids=m.reply_to_message.id
+    )
     if status:
-        await ms.edit_msg("DEL_SUCCESS_TRUE", string_args=(round((time.time() - start_time) * 1000, 2)))
+        await ms.edit_msg(
+            "DEL_SUCCESS_TRUE",
+            string_args=(round((time.time() - start_time) * 1000, 2)),
+        )
     else:
         await ms.edit_msg("DEL_SUCCESS_FALSE")
     time.sleep(3)
     await ms.delete()
+
 
 @Altruix.register_on_cmd(
     "purge",
