@@ -223,12 +223,12 @@ async def pm_pedma(c: Client, m: Message):
     user_args = m.user_args
     if user_args == "y":
         await Altruix.config.pm_enable()
-        await m.edit_msg("PM_SECURITY_ENABLED")
+        await m.reply_msg("PM_ENABLED")
     elif user_args == "n":
         await Altruix.config.pm_disable()
-        await m.edit_msg("PM_SECURITY_DISABLED")
+        await m.reply_msg("PM_DISABLED")
     else:
-        await m.edit_msg(user_args)
+        await m.reply_msg("PM_STATUS".format(user_args))
 
 
 @Altruix.on_message(
