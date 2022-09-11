@@ -7,12 +7,11 @@
 # All rights reserved.
 
 import glob
-import logging
 from Main import Altruix
+from ...core.config import Config
 from pyrogram.types import Message
 from pyrogram import Client, filters
 from ...core.types.message import Message
-from ...core.config import Config
 
 
 APPROVED_DICT = Config.APPROVED_DICT or {}
@@ -37,7 +36,6 @@ async def approve_user_pm_permit_func(c: Client, m: Message):
     if await Altruix.config.get_pm_sts():
         await msg.edit_msg("PM_SECURITY_DISABLED")
         return
-
 
     if m.chat.type != "private":
         user_, reason, is_channel = m.get_user
