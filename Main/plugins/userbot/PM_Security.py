@@ -7,13 +7,12 @@
 # All rights reserved.
 
 import glob
-import logging
 from Main import Altruix
+from ...core.config import Config
 from pyrogram.types import Message
 from pyrogram import Client, filters
+import logging
 from ...core.types.message import Message
-from ...core.config import Config, BaseConfig
-
 
 APPROVED_DICT = Config.APPROVED_DICT or {}
 CUSTOM_PM_MEDIA = Config.CUSTOM_PM_MEDIA
@@ -34,8 +33,8 @@ LPM = {}
 async def approve_user_pm_permit_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     user_ = m.chat.id
-    if not BaseConfig.PM_ENABLE:
-        logging.info("User DisAbled Pm-Permit.")
+    if not Altruix.Config.PM_ENABLE:
+        logging.info('User DisAbled Pm-Permit.')
         return
 
     if m.chat.type != "private":
@@ -86,8 +85,8 @@ async def approve_user_pm_permit_func(c: Client, m: Message):
 async def disapprove_user_pm_permit_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     user_ = m.chat.id
-    if not BaseConfig.PM_ENABLE:
-        logging.info("User DisAbled Pm-Permit.")
+    if not Altruix.config.PM_ENABLE:
+        logging.info('User DisAbled Pm-Permit.')
         return
 
     if m.chat.type != "private":
@@ -129,8 +128,8 @@ async def disapprove_user_pm_permit_func(c: Client, m: Message):
 )
 async def add_image_to_pm_permit(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
-    if not BaseConfig.PM_ENABLE:
-        logging.info("User DisAbled Pm-Permit.")
+    if not Altruix.config.PM_ENABLE:
+        logging.info('User DisAbled Pm-Permit.')
         return
 
     if m.user_args and "-default" in m.user_args:
@@ -163,8 +162,8 @@ async def add_image_to_pm_permit(c: Client, m: Message):
 )
 async def setpmwlimit(c: Client, m: Message):
     msg = m.handle_message("PROCESSING")
-    if not BaseConfig.PM_ENABLE:
-        logging.info("User DisAbled Pm-Permit.")
+    if not Altruix.config.PM_ENABLE:
+        logging.info('User DisAbled Pm-Permit.')
         return
 
     limit = str(m.user_input)
@@ -185,8 +184,8 @@ async def setpmwlimit(c: Client, m: Message):
 )
 async def add_custom_text_to_pm_permit(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
-    if not BaseConfig.PM_ENABLE:
-        logging.info("User DisAbled Pm-Permit.")
+    if not Altruix.config.PM_ENABLE:
+        logging.info('User DisAbled Pm-Permit.')
         return
 
     if m.user_args and "-default" in m.user_args:
@@ -212,8 +211,8 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
     filters.private & ~filters.group & ~filters.channel, 3, bot_mode_unsupported=True
 )
 async def pm_permit_(c: Client, m: Message):
-    if not BaseConfig.PM_ENABLE:
-        logging.info("User DisAbled Pm-Permit.")
+    if not Altruix.config.PM_ENABLE:
+        logging.info('User DisAbled Pm-Permit.')
         return
 
     if (
