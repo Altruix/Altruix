@@ -221,12 +221,14 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
 )
 async def pm_pedma(c: Client, m: Message):
     user_args = m.user_args
-    if user_args == "y":
+    if "-y" in user_args:
         await Altruix.config.pm_enable()
         await m.reply_msg("PM_ENABLED")
-    elif user_args == "n":
+
+    if "-n" in user_args:
         await Altruix.config.pm_disable()
         await m.reply_msg("PM_DISABLED")
+        
     else:
         await m.reply_msg("PM_STATUS", user_args)
 
