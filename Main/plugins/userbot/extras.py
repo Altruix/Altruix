@@ -15,8 +15,10 @@ import platform
 import contextlib
 from Main import Altruix
 from Main.utils.essentials import Essentials
+#from telegraph import Telegraph, upload_file
 from pyrogram.types.messages_and_media.message import Message
 
+# This Plugin might not work with Termux at all, both .ubstat and .telegraph
 
 # telegraph = Telegraph()
 # res = telegraph.create_account(short_name="Altruix")
