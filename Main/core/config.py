@@ -354,9 +354,9 @@ class Config(BaseConfig):
 
     async def pm_disable(self):
         self.PM_PERMIT = False
-        await self.add_env_to_db("PM_PERMIT", False)
+        await self.sync_env_to_db("PM_PERMIT", False)
 
     async def get_pm_sts(self):
-        if self.PM_PERMIT:
+        if await self.get_env_from_db("PM_PERMIT"):
             return True
         return False
