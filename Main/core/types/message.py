@@ -134,7 +134,7 @@ class Message:
             msg_ = await self.edit(text, **args)
         except MessageTooLong:
             text = Essentials.md_to_text(text)
-            service, paste_link = await Paste(text).paste
+            service, paste_link = await Paste(text).paste()
             _p = f"{headers.format(service.title())} : <b><a href='{paste_link}'>PREVIEW</a></b>"
             msg_ = await self.edit(_p, disable_web_page_preview=True, **args)
         if del_in and isinstance(del_in, int):
