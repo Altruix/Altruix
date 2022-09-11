@@ -228,7 +228,7 @@ async def pm_pedma(c: Client, m: Message):
     if "-n" in user_args:
         await Altruix.config.pm_disable()
         await m.reply_msg("PM_DISABLED")
-        
+
     else:
         await m.reply_msg("PM_STATUS", user_args)
 
