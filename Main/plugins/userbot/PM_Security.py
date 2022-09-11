@@ -34,7 +34,7 @@ async def approve_user_pm_permit_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     user_ = m.chat.id
     if await Altruix.config.get_pm_sts():
-        await msg.reply_msg("PM_SECURITY_DISABLED")
+        await c.send_message(Altruix.log_chat, f"**#APPROVE**\n\nStatus: `Can't Approve!`\n\n**Reason:** `PM Security is Disabled!`")
         return
 
     if m.chat.type != "private":
@@ -86,7 +86,7 @@ async def disapprove_user_pm_permit_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     user_ = m.chat.id
     if await Altruix.config.get_pm_sts():
-        await msg.reply_msg("PM_SECURITY_DISABLED")
+        await c.send_message(Altruix.log_chat, f"**#DISSPROVE**\n\nStatus: `Can't Disapprove!`\n\n**Reason:** `PM Security is Disabled!`")
         return
 
     if m.chat.type != "private":
@@ -129,7 +129,7 @@ async def disapprove_user_pm_permit_func(c: Client, m: Message):
 async def add_image_to_pm_permit(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     if await Altruix.config.get_pm_sts():
-        await msg.reply_msg("PM_SECURITY_DISABLED")
+        await c.send_message(Altruix.log_chat, f"**#Pm Picture**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`")
         return
 
     if m.user_args and "-default" in m.user_args:
@@ -163,7 +163,7 @@ async def add_image_to_pm_permit(c: Client, m: Message):
 async def setpmwlimit(c: Client, m: Message):
     msg = m.handle_message("PROCESSING")
     if await Altruix.config.get_pm_sts():
-        await msg.reply_msg("PM_SECURITY_DISABLED")
+        await c.send_message(Altruix.log_chat, f"**#Warn Limit**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`")
         return
 
     limit = str(m.user_input)
@@ -185,7 +185,7 @@ async def setpmwlimit(c: Client, m: Message):
 async def add_custom_text_to_pm_permit(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     if await Altruix.config.get_pm_sts():
-        await msg.reply_msg("PM_SECURITY_DISABLED")
+        await c.send_message(Altruix.log_chat, f"**#Pm Text**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`")
         return
 
     if m.user_args and "-default" in m.user_args:
@@ -208,7 +208,7 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
 
 
 @Altruix.register_on_cmd(
-    "pmepermit",
+    "pmpermit",
     bot_mode_unsupported=True,
     cmd_help={
         "help": "Changes Status Of PM Permit",
@@ -221,16 +221,15 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
 )
 async def pm_pedma(c: Client, m: Message):
     user_args = m.user_args
-    print(user_args)
-    await m.reply_msg(user_args)
-    if user_args == "y":
+    if "-y" in user_args:
         await Altruix.config.pm_enable()
-        await m.reply_msg("PM_SECURITY_ENABLED")
-    elif user_args == "n":
+        await c.send_message(Altruix.log_chat, f"**#Pm Permit**\n\nStatus: `Enabled`")
+        await m.reply_msg("Pm Security Status: `ENABLED`")
+
+    if "-n" in user_args:
         await Altruix.config.pm_disable()
-        await m.reply_msg("PM_SECURITY_DISABLED")
-    else:
-        await m.reply_msg(user_args)
+        await c.send_message(Altruix.log_chat, f"**#Pm Permit**\n\nStatus: `Disabled`")
+        await m.reply_msg("Pm Security Status: `DISABLED`")
 
 
 @Altruix.on_message(
