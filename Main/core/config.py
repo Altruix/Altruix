@@ -194,6 +194,8 @@ class Config(BaseConfig):
         except (ValueError, TypeError):
             return digit_
 
+    #to set pm_permit by defualt true, if the var is false then false
+            
     async def load_envs_to_db(self):
         if env_ := await self.get_env("LOAD_ENV_TO_DB"):
             if env_.lower() == "true":
@@ -345,3 +347,16 @@ class Config(BaseConfig):
         await self.env_col.find_one_and_update(
             {"_id": "SUDO_USERS"}, {"$pull": {"user_id": int(user_id)}}
         )
+
+    async def pm_enable(self):
+        self.PM_PERMIT = True
+        await self.add_env_to_db("PM_PERMIT", True)
+    
+    async def pm_disable(self):
+        self.PM_PERMIT = False
+        await self.add_env_to_db("PM_PERMIT", False)
+
+    async def get_pm_sts(self):
+        if self.PM_PERMIT:
+            return True
+        return False
