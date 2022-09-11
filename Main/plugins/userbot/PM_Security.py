@@ -208,7 +208,7 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
 
 
 @Altruix.register_on_cmd(
-    "pmepermit",
+    "pmpermit",
     bot_mode_unsupported=True,
     cmd_help={
         "help": "Changes Status Of PM Permit",
@@ -221,8 +221,6 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
 )
 async def pm_pedma(c: Client, m: Message):
     user_args = m.user_args
-    print(user_args)
-    await m.reply_msg(user_args)
     if user_args == "y":
         await Altruix.config.pm_enable()
         await m.reply_msg("PM_SECURITY_ENABLED")
