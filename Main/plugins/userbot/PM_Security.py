@@ -7,13 +7,11 @@
 # All rights reserved.
 
 import glob
-import logging
 from Main import Altruix
+from ...core.config import Config
 from pyrogram.types import Message
 from pyrogram import Client, filters
 from ...core.types.message import Message
-from ...core.config import Config, BaseConfig
-
 
 
 APPROVED_DICT = Config.APPROVED_DICT or {}
