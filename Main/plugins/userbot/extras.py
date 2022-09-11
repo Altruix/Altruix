@@ -87,20 +87,19 @@ async def sTATS(c: Altruix, m: Message):
 
 
 @Altruix.register_on_cmd(
-   ["telegraph", "tg"],
-   cmd_help={
-       "help": "upload files to telegraph",
-       "cmd_help": "telegraph <reply to media>",
-   },
-   requires_reply=True,
+    ["telegraph", "tg"],
+    cmd_help={
+        "help": "upload files to telegraph",
+        "cmd_help": "telegraph <reply to media>",
+    },
+    requires_reply=True,
 )
 async def download_files_from_telegram(c, m):
-   msg = await m.handle_message("PROCESSING")
-   if not m.reply_to_message.media:
-       return await msg.edit_msg("REPLY_TO_FILE")
-   media = await m.reply_to_message.download()
-   media_url = upload_file(media)
-   await msg.edit(f"https://graph.org{media_url[0]}")
-   if os.path.exists(media):
-       os.remove(media)
-
+    msg = await m.handle_message("PROCESSING")
+    if not m.reply_to_message.media:
+        return await msg.edit_msg("REPLY_TO_FILE")
+    media = await m.reply_to_message.download()
+    media_url = upload_file(media)
+    await msg.edit(f"https://graph.org{media_url[0]}")
+    if os.path.exists(media):
+        os.remove(media)
