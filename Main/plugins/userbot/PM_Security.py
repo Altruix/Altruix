@@ -221,6 +221,7 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
 )
 async def pm_pedma(c: Client, m: Message):
     user_args = m.user_args
+    print(user_args)
     await m.reply_msg(user_args)
     if user_args == "y":
         await Altruix.config.pm_enable()
@@ -229,7 +230,7 @@ async def pm_pedma(c: Client, m: Message):
         await Altruix.config.pm_disable()
         await m.reply_msg("PM_SECURITY_DISABLED")
     else:
-        await m.reply_msg("Invalid Args Check")
+        await m.reply_msg(user_args)
 
 
 @Altruix.on_message(
