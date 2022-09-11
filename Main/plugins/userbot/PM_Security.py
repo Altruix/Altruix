@@ -229,10 +229,6 @@ async def pm_pedma(c: Client, m: Message):
         await Altruix.config.pm_disable()
         await m.reply_msg("PM_DISABLED")
 
-    else:
-        await m.reply_msg("PM_STATUS", user_args)
-
-
 @Altruix.on_message(
     filters.private & ~filters.group & ~filters.channel, 3, bot_mode_unsupported=True
 )
