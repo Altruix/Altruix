@@ -236,7 +236,7 @@ async def pm_pedma(c: Client, m: Message):
 )
 async def pm_permit_(c: Client, m: Message):
     if await Altruix.config.get_pm_sts():
-        await msg.edit_msg("PM_SECURITY_DISABLED")
+        await m.edit_msg("PM_SECURITY_DISABLED")
         return
 
     if (
