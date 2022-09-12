@@ -6,6 +6,7 @@
 #
 # All rights reserved.
 
+import base64
 import os
 import re
 import uuid
@@ -13,16 +14,22 @@ import psutil
 import socket
 import platform
 import contextlib
+from os import remove as rmv
 from Main import Altruix
+from Main.utils.paste import Paste
 from pyrogram.types import Message
 from Main.utils.essentials import Essentials
-from telegraph import Telegraph, upload_file
+from mimetypes import guess_type
+# from telegraph import Telegraph, upload_file
 
 
-telegraph = Telegraph()
-res = telegraph.create_account(short_name="Altruix")
-auth_url = res["auth_url"]
+# telegraph = Telegraph()
+# res = telegraph.create_account(short_name="Altruix")
+# auth_url = res["auth_url"]
 
+def fileToBase64(file_path: str) -> str:
+    with open(file_path, "rb") as file:
+        return base64.b64encode(file.read())
 
 @Altruix.run_in_exc
 def get_info():
@@ -85,21 +92,47 @@ async def sTATS(c: Altruix, m: Message):
     out_ = tuple(s)
     await msg.edit_msg("UBSTAT", string_args=out_)
 
+#Unstable
 
 @Altruix.register_on_cmd(
-    ["telegraph", "tg"],
+    ["base64", "b64"],
     cmd_help={
-        "help": "upload files to telegraph",
-        "cmd_help": "telegraph <reply to media>",
+        "help": "Encodes given file to an url",
+        "example": "base64 <reply_to_file>"
     },
     requires_reply=True,
 )
-async def download_files_from_telegram(c, m):
+async def file_to_b64(c: Altruix, m: Message):
     msg = await m.handle_message("PROCESSING")
-    if not m.reply_to_message.media:
-        return await msg.edit_msg("REPLY_TO_FILE")
-    media = await m.reply_to_message.download()
-    media_url = upload_file(media)
-    await msg.edit(f"https://graph.org{media_url[0]}")
-    if os.path.exists(media):
-        os.remove(media)
+    if not msg.reply_to_message.media:
+        return msg.edit("Reply to media...")
+    file = await msg.reply_to_message.download()
+    base = fileToBase64(file)
+    type = guess_type(file)[0]
+    name, link =  await Paste(f"data:{type};base64,{str(base)[2:][:-1]}").paste()
+    await msg.edit(
+            Altruix.get_string("PASTE_TEXT").format(link, name),
+            disable_web_page_preview=True,
+        )
+    rmv(file)
+
+
+
+
+# @Altruix.register_on_cmd(
+#     ["telegraph", "tg"],
+#     cmd_help={
+#         "help": "upload files to telegraph",
+#         "cmd_help": "telegraph <reply to media>",
+#     },
+#     requires_reply=True,
+# )
+# async def download_files_from_telegram(c, m):
+#     msg = await m.handle_message("PROCESSING")
+#     if not m.reply_to_message.media:
+#         return await msg.edit_msg("REPLY_TO_FILE")
+#     media = await m.reply_to_message.download()
+#     media_url = upload_file(media)
+#     await msg.edit(f"https://graph.org{media_url[0]}")
+#     if os.path.exists(media):
+#         os.remove(media)
