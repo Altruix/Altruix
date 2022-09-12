@@ -6,20 +6,22 @@
 #
 # All rights reserved.
 
-import base64
 import os
 import re
 import uuid
+import base64
 import psutil
 import socket
 import platform
 import contextlib
-from os import remove as rmv
 from Main import Altruix
+from os import remove as rmv
+from mimetypes import guess_type
 from Main.utils.paste import Paste
 from pyrogram.types import Message
 from Main.utils.essentials import Essentials
-from mimetypes import guess_type
+
+
 # from telegraph import Telegraph, upload_file
 
 
@@ -27,9 +29,11 @@ from mimetypes import guess_type
 # res = telegraph.create_account(short_name="Altruix")
 # auth_url = res["auth_url"]
 
+
 def fileToBase64(file_path: str) -> str:
     with open(file_path, "rb") as file:
         return base64.b64encode(file.read())
+
 
 @Altruix.run_in_exc
 def get_info():
@@ -92,13 +96,15 @@ async def sTATS(c: Altruix, m: Message):
     out_ = tuple(s)
     await msg.edit_msg("UBSTAT", string_args=out_)
 
-#Unstable
+
+# Unstable
+
 
 @Altruix.register_on_cmd(
     ["base64", "b64"],
     cmd_help={
         "help": "Encodes given file to an url",
-        "example": "base64 <reply_to_file>"
+        "example": "base64 <reply_to_file>",
     },
     requires_reply=True,
 )
@@ -109,14 +115,12 @@ async def file_to_b64(c: Altruix, m: Message):
     file = await msg.reply_to_message.download()
     base = fileToBase64(file)
     type = guess_type(file)[0]
-    name, link =  await Paste(f"data:{type};base64,{str(base)[2:][:-1]}").paste()
+    name, link = await Paste(f"data:{type};base64,{str(base)[2:][:-1]}").paste()
     await msg.edit(
-            Altruix.get_string("PASTE_TEXT").format(link, name),
-            disable_web_page_preview=True,
-        )
+        Altruix.get_string("PASTE_TEXT").format(link, name),
+        disable_web_page_preview=True,
+    )
     rmv(file)
-
-
 
 
 # @Altruix.register_on_cmd(
