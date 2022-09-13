@@ -7,7 +7,8 @@
 # All rights reserved.
 
 # Edit this file to customize style of your UserBot.
-# Works only well with local deployment and github forks, .env based solution OTW
+# Works only well with local deployment and github forks, .env based
+# solution OTW
 
 bullets = {
     "bullet1": ">",

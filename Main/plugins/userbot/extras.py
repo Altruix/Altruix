@@ -32,8 +32,8 @@ from Main.utils.essentials import Essentials
 
 def fileToBase64(file_path: str) -> str:
     """
-        File to Base64
-            takes a file as input and encodes it to base 64
+    File to Base64
+        takes a file as input and encodes it to base 64
     """
     with open(file_path, "rb") as file:
         return base64.b64encode(file.read())
@@ -42,10 +42,10 @@ def fileToBase64(file_path: str) -> str:
 @Altruix.run_in_exc
 def get_info(value=False) -> tuple:
     """
-        Get Info
-            fetches information about your system
-            hides MAC and IP until explicitly referenced
-            incompatible with termux due to problem with ethtool.h file .so objects
+    Get Info
+        fetches information about your system
+        hides MAC and IP until explicitly referenced
+        incompatible with termux due to problem with ethtool.h file .so objects
     """
     splatform = platform.system()
     platform_release = platform.release()
@@ -93,7 +93,7 @@ def get_info(value=False) -> tuple:
     cmd_help={
         "help": "Get info about your machine.",
         "example": "ubstat",
-        "user_args": {"a": "Reveal all info - IP and MAC"}
+        "user_args": {"a": "Reveal all info - IP and MAC"},
     },
 )
 async def sTATS(c: Altruix, m: Message):
