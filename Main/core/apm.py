@@ -7,6 +7,12 @@
 # All rights reserved.
 #
 
+"""
+    Altruix Package Manager
+        Manages plugins of Altruix
+        Work on progress
+"""
+
 import os
 import json
 import httpx

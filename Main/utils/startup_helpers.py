@@ -11,7 +11,10 @@ import aiohttp
 from ._validators import is_url
 
 
-def concatenate(i: any, max_value: any, to_add: str, from_end=True):
+def concatenate(i: any, max_value: any, to_add: str, from_end=True) -> str:
+    """
+        Concatenate whitespace or anyother character to the string in an ordered manner.
+    """
     if from_end:
         return str(i) + (len(str(max_value)) - len(str(i))) * to_add
     return (len(str(max_value)) - len(str(i))) * to_add + str(i)

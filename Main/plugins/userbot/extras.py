@@ -31,12 +31,22 @@ from Main.utils.essentials import Essentials
 
 
 def fileToBase64(file_path: str) -> str:
+    """
+        File to Base64
+            takes a file as input and encodes it to base 64
+    """
     with open(file_path, "rb") as file:
         return base64.b64encode(file.read())
 
 
 @Altruix.run_in_exc
-def get_info():
+def get_info(value=False) -> tuple:
+    """
+        Get Info
+            fetches information about your system
+            hides MAC and IP until explicitly referenced
+            incompatible with termux due to problem with ethtool.h file .so objects
+    """
     splatform = platform.system()
     platform_release = platform.release()
     platform_version = platform.version()
@@ -68,8 +78,8 @@ def get_info():
         platform_version,
         architecture,
         hostname,
-        ip_address,
-        mac_address,
+        ip_address if value else None,
+        mac_address if value else None,
         processor,
         ram,
         cpu_len,
@@ -83,18 +93,19 @@ def get_info():
     cmd_help={
         "help": "Get info about your machine.",
         "example": "ubstat",
+        "user_args": {"a": "Reveal all info - IP and MAC"}
     },
 )
 async def sTATS(c: Altruix, m: Message):
     msg = await m.handle_message("PROCESSING")
-    ub_stat = tuple(await get_info())
+    value = m.user_args and (all(item in ["-all", "-a"] for item in m.user_args))
+    ub_stat = await get_info(value)
     database_ = await Altruix.db._db_name.command("dbstats")
-    s = ub_stat + (
+    s = tuple(ub_stat) + (
         Essentials.humanbytes(database_["dataSize"]),
         Essentials.humanbytes(database_.get("storageSize")),
     )
-    out_ = tuple(s)
-    await msg.edit_msg("UBSTAT", string_args=out_)
+    await msg.edit_msg("UBSTAT", string_args=s)
 
 
 # Unstable
