@@ -236,15 +236,15 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
 )
 async def pm_pedma(c: Client, m: Message):
     user_args = m.user_args
-    if "-y" in user_args:
-        await Altruix.config.pm_enable()
-        await c.send_message(Altruix.log_chat, f"**#Pm Permit**\n\nStatus: `Enabled`")
-        await m.reply_msg("Pm Security Status: `ENABLED`")
-
     if "-n" in user_args:
-        await Altruix.config.pm_disable()
+        await Altruix.config.pm_enable()
         await c.send_message(Altruix.log_chat, f"**#Pm Permit**\n\nStatus: `Disabled`")
-        await m.reply_msg("Pm Security Status: `DISABLED`")
+        await m.reply_msg("Pm Security Status: `Disabled`")
+
+    if "-y" in user_args:
+        await Altruix.config.pm_disable()
+        await c.send_message(Altruix.log_chat, f"**#Pm Permit**\n\nStatus: `Enabled`")
+        await m.reply_msg("Pm Security Status: `Enabled`")
 
 
 @Altruix.on_message(
