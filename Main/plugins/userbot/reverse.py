@@ -69,6 +69,7 @@ async def reverse_search_func_(c: Client, m: Message):
             else:
                 return await msg.edit_msg("GOOGLE_NOT_FOUND")
             end = pc()
+            rmv(photo)
             return await msg.edit_msg(
                 "GOOGLE_RESULT",
                 string_args=(
