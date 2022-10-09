@@ -80,10 +80,17 @@ async def listdir_cmd_handler(c: Client, m: Message):
     cmd_help={
         "help": "Removes given directory or file from the system.",
         "example": "rm -a |*.log",
-        "user_args": {
-            "d": "to remove a directory from the system.",
-            "a": "to remove files of the same type from a directory.",
-        },
+        "user_args": [
+            {
+                "arg": "d",
+                "help": "to remove a directory from the system.",
+                "requires_input": False
+            },
+            {
+                "arg": "a",
+                "help": "to remove files of the same type from a directory.",
+                "requires_input": False
+            }]
     },
     requires_input=True,
 )
@@ -92,7 +99,7 @@ async def remove_cmd_handler(c: Client, m: Message):
     input_ = m.raw_user_input
     u_input = m.user_input
     if user_args := m.user_args:
-        if "-d" in user_args:
+        if "d" in user_args:
             try:
                 if not exists(u_input):
                     return await msg.edit(
@@ -111,7 +118,7 @@ async def remove_cmd_handler(c: Client, m: Message):
                 return await msg.edit(
                     f"<b>Unable to delete</b>, <code>{u_input}</code>.\n\n<i><b><u>Traceback:</u></b></i>\n\n<code>{traceback}</code>"
                 )
-        elif "-a" in user_args:
+        elif "a" in user_args:
             if "|*." not in u_input:
                 return await msg.edit_msg("INVALID_INPUT")
             data = u_input.split("*")

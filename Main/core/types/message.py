@@ -6,11 +6,12 @@
 #
 # All rights reserved.
 
+from dataclasses import dataclass
 import re
 import asyncio
 import contextlib
 from Main import Altruix
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 from Main.utils.paste import Paste
 from datetime import datetime, timedelta
 from pyrogram.utils import zero_datetime
@@ -23,7 +24,18 @@ from Main.utils.file_helpers import make_file_from_text
 
 class REGEX_STRINGS(object):
     ARGS_REGEX = r"(-[a-zA-Z]+)([0-9]*)$"
+@dataclass
+class Arg:
+    key: str
+    value: str
 
+class Args(list):
+    def __init__(self, *args):
+        super(Args, self).__init__(args)
+    def __contains__(self, key):
+        return key in [x.key for x in self]    
+    def __getattr__(self, key):
+        return {x.key: x.value for x in self}.get(key)
 
 @monkeypatch(RawMessage)
 class Message:
@@ -77,15 +89,21 @@ class Message:
             return None
 
     @property
-    def user_args(self):
-        msg_t = self.raw_user_input
-        if msg_t is None:
+    def user_args(self) -> Args[Arg]:
+        raw_user_input = self.raw_user_input
+        if raw_user_input is None:
             return []
-        user_args: list = []
-        for msg_t in msg_t.split(" "):
-            ou_ = re.match(REGEX_STRINGS.ARGS_REGEX, str(msg_t))
-            if ou_ is not None:
-                user_args.append(ou_.group())
+        user_args: Args[Arg] = Args()
+        matches = re.findall(r'-(\w+ ?.*?(?=-)|\w+)?|\w+', raw_user_input)
+        for match in matches:
+            if not match:
+                continue
+            splitted = match.split(" ", 1)
+            arg_name = splitted[0]
+            arg_value = None
+            if len(splitted) > 1:
+                arg_value = splitted[1]
+            user_args.append(Arg(arg_name, arg_value))
         return user_args
 
     async def edit_msg(

@@ -14,7 +14,13 @@ from Main.core.types.message import Message
 from pyrogram.errors.exceptions.bad_request_400 import ChatSendInlineForbidden
 
 
-___args__m = {"m": "prompts to choose a service from a menu"}
+___args__m = [
+        {
+        "arg": "to",
+        "help": f"Paste the output to a specific paste bin\n.Available options: {','.join(Paste().all_bins)}. If provided with empty, it'll prompt with a menu",
+        "requires_input": False
+    }
+]
 
 (
     ___args__m.update(_each, f"Pastes the output to {_each}")
@@ -27,7 +33,7 @@ ___args__m = {"m": "prompts to choose a service from a menu"}
     bot_mode_unsupported=True,
     cmd_help={
         "help": "To paste the text to pastebin services.",
-        "example": "paste",
+        "example": "paste -to",
         "user_args": ___args__m,
     },
 )
@@ -47,7 +53,7 @@ async def paste(c: Client, m: Message):
     else:
         await m.edit_msg("Reply to a file or text to paste!")
         return
-    if "-m" in m.user_args:
+    if [x.key for x in  m.user_args if (x.key == "to" and not x.value)]:
         _hash = random_hash()
         Altruix.local_db.add_to_col("paste", {_hash: text})
         try:
@@ -63,7 +69,7 @@ async def paste(c: Client, m: Message):
             await m.delete_if_self()
         except ChatSendInlineForbidden:
             return await m.edit_msg(Altruix.get_string("INLINE_NOT_ALLOWED"))
-    elif val := (set(m.user_args) & set(Paste().all_bins)):
+    elif val := [x.key for x in  m.user_args if (x.key == "to" and x.value in Paste().all_bins)]:
         name, link = await Paste(text, service=val[0]).paste()
         try:
             results = await c.get_inline_bot_results(

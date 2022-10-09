@@ -94,7 +94,13 @@ async def add_sudo_func(c: Client, m: Message):
     cmd_help={
         "help": "remove sudo from sudo list, requires a restart to reflect the changes",
         "example": "rmsudo @warner_stark",
-        "user_args": {"a": "removes all sudos from the db."},
+        "user_args": [
+            {
+                "arg": "a",
+                "help": "Removes all sudos from the db.",
+                "requires_input": False
+            },
+            ],
     },
 )
 async def rm_sudo_func(c: Client, m: Message):
@@ -102,7 +108,7 @@ async def rm_sudo_func(c: Client, m: Message):
     user, _, is_channel = m.get_user
     acg = await Altruix.config.get_sudo()
     if user_args := m.user_args:
-        if "-a" in user_args:
+        if "a" in user_args:
             count = 0
             lacg = len(acg)
             for i in acg:

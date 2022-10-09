@@ -7,6 +7,8 @@
 # All rights reserved.
 
 import glob
+
+from click import edit
 from Main import Altruix
 from ...core.config import Config
 from pyrogram.types import Message
@@ -14,34 +16,28 @@ from pyrogram import Client, filters
 from ...core.types.message import Message
 
 
-APPROVED_DICT = Config.APPROVED_DICT or {}
-CUSTOM_PM_MEDIA = Config.CUSTOM_PM_MEDIA
-CUSTOM_PM_TEXT = Config.CUSTOM_PM_TEXT
-PM_WARNS_DICT = Config.PM_WARNS_DICT
-PM_WARNS_ACTIVE_CACHE = {}
-LPM = {}
 
+pm_permit_warning_cache = {}
+whatever_this_shit_is = {}
+pm_permit_col = Altruix.db.make_collection("pm_permit")
 
 @Altruix.register_on_cmd(
     "approve",
     bot_mode_unsupported=True,
     cmd_help={
         "help": "Approves the targeted user!",
-        "example": "approve @warner_stark",
+        "example": "approve @username",
     },
 )
 async def approve_user_pm_permit_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     user_ = m.chat.id
     if await Altruix.config.get_pm_sts():
-        await c.send_message(
-            Altruix.log_chat,
-            f"**#APPROVE**\n\nStatus: `Can't Approve!`\n\n**Reason:** `PM Security is Disabled!`",
-        )
+        await m.edit("<code>PM permit is disabled</code>")
         return
 
     if m.chat.type != "private":
-        user_, reason, is_channel = m.get_user
+        user_, _, is_channel = m.get_user
         if is_channel:
             return await msg.edit_msg("INVALID_USER")
     try:
@@ -51,29 +47,14 @@ async def approve_user_pm_permit_func(c: Client, m: Message):
     if not user_:
         return await msg.edit_msg("INVALID_USER")
     user_id = user_.id
-    APPROVED_LIST = f"TO_PM_APPROVED_USERS_LIST_{c.myself.id}"
-    get_approved = await Altruix.db.data_col.find_one(APPROVED_LIST)
-    get_approved_ = []
-    if get_approved:
-        get_approved_ = get_approved.get("user_id")
-        if not isinstance(get_approved_, list):
-            get_approved_ = [get_approved_]
-        APPROVED_DICT[c.myself.id] = get_approved_
-    if (get_approved) and (user_id in get_approved_):
-        return await msg.edit_msg("ALREADY_APPROVED")
-    if APPROVED_DICT.get(c.myself.id):
-        if user_id not in APPROVED_DICT[c.myself.id]:
-            APPROVED_DICT[c.myself.id].append(user_id)
+    user_info = await pm_permit_col.find_one({"user_id": user_id})
+    if not user_info:
+        await pm_permit_col.insert_one({"user_id": user_id, "approved": True})
     else:
-        APPROVED_DICT[c.myself.id] = [user_id]
-    if not get_approved:
-        await Altruix.db.data_col.insert_one(
-            {"_id": APPROVED_LIST, "user_id": [user_id]}
-        )
-    else:
-        await Altruix.db.data_col.update_one(
-            {"_id": APPROVED_LIST}, {"$push": {"user_id": user_id}}
-        )
+        if user_info.get("approved", False):
+            await pm_permit_col.update_one({"user_id": user_id}, {"$set": {"approved": True}})
+        else:
+            return await msg.edit_msg("ALREADY_APPROVED")
     await msg.edit_msg("APPROVED", string_args=(user_.mention))
 
 
@@ -82,7 +63,7 @@ async def approve_user_pm_permit_func(c: Client, m: Message):
     bot_mode_unsupported=True,
     cmd_help={
         "help": "Disapproves the targeted user!",
-        "example": "disapprove @warner_stark",
+        "example": "disapprove @username",
     },
 )
 async def disapprove_user_pm_permit_func(c: Client, m: Message):
@@ -96,7 +77,7 @@ async def disapprove_user_pm_permit_func(c: Client, m: Message):
         return
 
     if m.chat.type != "private":
-        user_, reason, is_channel = m.get_user
+        user_, _, is_channel = m.get_user
         if is_channel:
             return await msg.edit_msg("INVALID_USER")
     try:
@@ -106,120 +87,113 @@ async def disapprove_user_pm_permit_func(c: Client, m: Message):
     if not user_:
         return await msg.edit_msg("INVALID_USER")
     user_id = user_.id
-    APPROVED_LIST = f"TO_PM_APPROVED_USERS_LIST_{c.myself.id}"
-    get_approved = await Altruix.db.data_col.find_one(APPROVED_LIST)
-    if get_approved:
-        get_approved_user_list = get_approved.get("user_id")
+    user_info = await pm_permit_col.find_one({"user_id": user_id})
+    if not user_info:
+        await pm_permit_col.insert_one({"user_id": user_id, "approved": False, "action_user_id": c.myself.id, "is_global": False})
     else:
-        return await msg.edit_msg("NOT_APPROVED")
-    if not get_approved_user_list:
-        return await msg.edit_msg("NOT_APPROVED")
-    if (APPROVED_DICT.get(c.myself.id)) and (user_id in APPROVED_DICT[c.myself.id]):
-        APPROVED_DICT[c.myself.id].remove(user_id)
-    if user_id not in get_approved_user_list:
-        return await msg.edit_msg("NOT_APPROVED")
-    await Altruix.db.data_col.update_one(
-        {"_id": APPROVED_LIST}, {"$pull": {"user_id": user_id}}
-    )
+        if user_info.get("approved", False):
+            return await msg.edit_msg("ALREADY_DISAPPROVED")
+        else:
+            await pm_permit_col.update_one({"user_id": user_id}, {"$set": {"approved": False}})
     await msg.edit_msg("DIS_APPROVED", string_args=(user_.mention))
 
 
-@Altruix.register_on_cmd(
-    "setpmpic",
-    bot_mode_unsupported=True,
-    cmd_help={
-        "help": "Sets the PM picture to be sent to the pms!",
-        "example": "setpmpic (reply to image)",
-    },
-)
-async def add_image_to_pm_permit(c: Client, m: Message):
-    msg = await m.handle_message("PROCESSING")
-    if await Altruix.config.get_pm_sts():
-        await c.send_message(
-            Altruix.log_chat,
-            f"**#Pm Picture**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`",
-        )
-        return
+# @Altruix.register_on_cmd(
+#     "setpmpic",
+#     bot_mode_unsupported=True,
+#     cmd_help={
+#         "help": "Sets the PM picture to be sent to the pms!",
+#         "example": "setpmpic (reply to image)",
+#     },
+# )
+# async def add_image_to_pm_permit(c: Client, m: Message):
+#     msg = await m.handle_message("PROCESSING")
+#     if await Altruix.config.get_pm_sts():
+#         await c.send_message(
+#             Altruix.log_chat,
+#             f"**#Pm Picture**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`",
+#         )
+#         return
 
-    if m.user_args and "-default" in m.user_args:
-        CUSTOM_PM_MEDIA[c.myself.id] = None
-        await Altruix.config.del_env_from_db(f"PM_MEDIA_{c.myself.id}")
-        return await msg.edit_msg("DEFAULT_PM_PIC_SET_TO_DEFAULT")
-    if (not m.reply_to_message) and (not m.reply_to_message.media):
-        return await msg.edit_msg("INVALID_REPLY")
-    if not Altruix.log_chat:
-        return await msg.edit_msg("ERROR_404_NO_LOG_CHAT")
-    try:
-        media_id = await m.reply_to_message.copy(Altruix.log_chat)
-    except Exception as e:
-        return await msg.edit_msg("PM_MEDIA_SET_FAILED", string_args=(e))
-    await Altruix.config.sync_env_to_db(f"PM_MEDIA_{c.myself.id}", media_id.id)
-    CUSTOM_PM_MEDIA[c.myself.id] = media_id.id
-    if media_id.caption:
-        CUSTOM_PM_TEXT[c.myself.id] = media_id.caption
-        await Altruix.config.sync_env_to_db(f"PM_TEXT_{c.myself.id}", media_id.caption)
-    await msg.edit_msg("PM_SET_SUCCESSFULLY")
-
-
-@Altruix.register_on_cmd(
-    ["setpmwarnlimit", "spwl"],
-    bot_mode_unsupported=True,
-    cmd_help={
-        "help": "Set your custom max PM warning limit!",
-        "example": "setpmwarnlimit 5",
-    },
-)
-async def setpmwlimit(c: Client, m: Message):
-    msg = m.handle_message("PROCESSING")
-    if await Altruix.config.get_pm_sts():
-        await c.send_message(
-            Altruix.log_chat,
-            f"**#Warn Limit**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`",
-        )
-        return
-
-    limit = str(m.user_input)
-    if not limit or not limit.isdigit() or (int(limit) <= 1):
-        return await msg.edit_msg("INVALID_LIMIT", string_args=(limit))
-    await Altruix.config.sync_env_to_db(f"PM_WARNS_COUNT_{c.myself.id}", int(limit))
-    PM_WARNS_DICT[c.myself.id] = int(limit)
-    await msg.edit_msg("LIMIT_SET", string_args=(limit))
+#     if m.user_args and "-default" in m.user_args:
+#         CUSTOM_PM_MEDIA[c.myself.id] = None
+#         await Altruix.config.del_env_from_db(f"PM_MEDIA_{c.myself.id}")
+#         return await msg.edit_msg("DEFAULT_PM_PIC_SET_TO_DEFAULT")
+#     if (not m.reply_to_message) and (not m.reply_to_message.media):
+#         return await msg.edit_msg("INVALID_REPLY")
+#     if not Altruix.log_chat:
+#         return await msg.edit_msg("ERROR_404_NO_LOG_CHAT")
+#     try:
+#         media_id = await m.reply_to_message.copy(Altruix.log_chat)
+#     except Exception as e:
+#         return await msg.edit_msg("PM_MEDIA_SET_FAILED", string_args=(e))
+#     await Altruix.config.sync_env_to_db(f"PM_MEDIA_{c.myself.id}", media_id.id)
+#     CUSTOM_PM_MEDIA[c.myself.id] = media_id.id
+#     if media_id.caption:
+#         CUSTOM_PM_TEXT[c.myself.id] = media_id.caption
+#         await Altruix.config.sync_env_to_db(f"PM_TEXT_{c.myself.id}", media_id.caption)
+#     await msg.edit_msg("PM_SET_SUCCESSFULLY")
 
 
-@Altruix.register_on_cmd(
-    ["setpmtext"],
-    bot_mode_unsupported=True,
-    cmd_help={
-        "help": "Sets the text to be sent in the PM!",
-        "example": "setpmtext Hello World!",
-    },
-)
-async def add_custom_text_to_pm_permit(c: Client, m: Message):
-    msg = await m.handle_message("PROCESSING")
-    if await Altruix.config.get_pm_sts():
-        await c.send_message(
-            Altruix.log_chat,
-            f"**#Pm Text**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`",
-        )
-        return
+# @Altruix.register_on_cmd(
+#     ["setpmwarnlimit", "spwl"],
+#     bot_mode_unsupported=True,
+#     cmd_help={
+#         "help": "Set your custom max PM warning limit!",
+#         "example": "setpmwarnlimit 5",
+#     },
+# )
+# async def setpmwlimit(c: Client, m: Message):
+#     msg = m.handle_message("PROCESSING")
+#     if await Altruix.config.get_pm_sts():
+#         await c.send_message(
+#             Altruix.log_chat,
+#             f"**#Warn Limit**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`",
+#         )
+#         return
 
-    if m.user_args and "-default" in m.user_args:
-        CUSTOM_PM_TEXT[c.myself.id] = None
-        await Altruix.config.del_env_from_db(f"PM_TEXT_{c.myself.id}")
-        return await msg.edit_msg("DEFAULT_PM_TEXT_SET_TO_DEFAULT")
-    if not m.reply_to_message and not m.raw_user_input:
-        return await msg.edit_msg("INVALID_REPLY")
-    if m.reply_to_message and m.reply_to_message.text:
-        text = m.reply_to_message.text
-    elif m.reply_to_message and m.raw_user_input or not m.reply_to_message:
-        text = m.raw_user_input
-    elif m.reply_to_message.caption:
-        text = m.reply_to_message.caption
-    else:
-        return await msg.edit_msg("INVALID_REPLY")
-    await Altruix.config.sync_env_to_db(f"PM_TEXT_{c.myself.id}", text)
-    CUSTOM_PM_TEXT[c.myself.id] = text
-    await msg.edit_msg("PM_TEXT_INIT")
+#     limit = str(m.user_input)
+#     if not limit or not limit.isdigit() or (int(limit) <= 1):
+#         return await msg.edit_msg("INVALID_LIMIT", string_args=(limit))
+#     await Altruix.config.sync_env_to_db(f"PM_WARNS_COUNT_{c.myself.id}", int(limit))
+#     PM_WARNS_DICT[c.myself.id] = int(limit)
+#     await msg.edit_msg("LIMIT_SET", string_args=(limit))
+
+
+# @Altruix.register_on_cmd(
+#     ["setpmtext"],
+#     bot_mode_unsupported=True,
+#     cmd_help={
+#         "help": "Sets the text to be sent in the PM!",
+#         "example": "setpmtext Hello World!",
+#     },
+# )
+# async def add_custom_text_to_pm_permit(c: Client, m: Message):
+#     msg = await m.handle_message("PROCESSING")
+#     if await Altruix.config.get_pm_sts():
+#         await c.send_message(
+#             Altruix.log_chat,
+#             f"**#Pm Text**\n\nStatus: `Can't Set!`\n\n**Reason:** `PM Security is Disabled!`",
+#         )
+#         return
+
+#     if m.user_args and "-default" in m.user_args:
+#         CUSTOM_PM_TEXT[c.myself.id] = None
+#         await Altruix.config.del_env_from_db(f"PM_TEXT_{c.myself.id}")
+#         return await msg.edit_msg("DEFAULT_PM_TEXT_SET_TO_DEFAULT")
+#     if not m.reply_to_message and not m.raw_user_input:
+#         return await msg.edit_msg("INVALID_REPLY")
+#     if m.reply_to_message and m.reply_to_message.text:
+#         text = m.reply_to_message.text
+#     elif m.reply_to_message and m.raw_user_input or not m.reply_to_message:
+#         text = m.raw_user_input
+#     elif m.reply_to_message.caption:
+#         text = m.reply_to_message.caption
+#     else:
+#         return await msg.edit_msg("INVALID_REPLY")
+#     await Altruix.config.sync_env_to_db(f"PM_TEXT_{c.myself.id}", text)
+#     CUSTOM_PM_TEXT[c.myself.id] = text
+#     await msg.edit_msg("PM_TEXT_INIT")
 
 
 @Altruix.register_on_cmd(
@@ -228,29 +202,41 @@ async def add_custom_text_to_pm_permit(c: Client, m: Message):
     cmd_help={
         "help": "Changes Status Of PM Permit",
         "example": "pmpermit -y or -n",
-        "user_args": {
-            "y": "Enables Pm Permit",
-            "n": "Disables Pm Permit",
-        },
+        "user_args": [
+                        {
+                "arg": "y",
+                "help": "Enables Pm Permit.",
+                "requires_input": False
+            },
+                                                {
+                "arg": "n",
+                "help": "Disables Pm Permit.",
+                "requires_input": False
+            },
+        ],
     },
 )
-async def pm_pedma(c: Client, m: Message):
+async def pm_permit_command_handler(c: Client, m: Message):
     user_args = m.user_args
-    if "-n" in user_args:
-        await Altruix.config.pm_enable()
+    if "n" in user_args:
+        await Altruix.config.sync_env_to_db("PM_PERMIT", False)
         await c.send_message(Altruix.log_chat, f"**#Pm Permit**\n\nStatus: `Disabled`")
         await m.reply_msg("Pm Security Status: `Disabled`")
 
-    if "-y" in user_args:
-        await Altruix.config.pm_disable()
+    elif "y" in user_args:
+        await Altruix.config.sync_env_to_db("PM_PERMIT", True)
         await c.send_message(Altruix.log_chat, f"**#Pm Permit**\n\nStatus: `Enabled`")
         await m.reply_msg("Pm Security Status: `Enabled`")
+    else:
+        await m.reply_msg("Current PM security status: <code>{}</code>".format(
+            "Enabled" if await Altruix.config.get_env("PM_PERMIT") else "Disabled"
+        ))
 
 
 @Altruix.on_message(
     filters.private & ~filters.group & ~filters.channel, 3, bot_mode_unsupported=True
 )
-async def pm_permit_(c: Client, m: Message):
+async def pm_permit_new_message_listener_handler(c: Client, m: Message):
     if await Altruix.config.get_pm_sts():
         return
 
@@ -262,72 +248,23 @@ async def pm_permit_(c: Client, m: Message):
         or (m.from_user.is_bot)
     ):
         return
-    if APPROVED_DICT.get(c.myself.id) and m.from_user.id in APPROVED_DICT[c.myself.id]:
-        return
+
     if m.from_user.is_self or m.from_user.is_contact or m.from_user.is_bot:
         return
-    pm_warns_count = int(PM_WARNS_DICT.get(c.myself.id) or 3)
+    pm_warns_count = int(pm_permit_warning_cache.get(c.myself.id) or 3)
     if (
-        PM_WARNS_ACTIVE_CACHE.get(int(m.from_user.id))
-        and int(PM_WARNS_ACTIVE_CACHE[m.from_user.id]) >= pm_warns_count
+        pm_permit_warning_cache.get(int(m.from_user.id))
+        and int(pm_permit_warning_cache[m.from_user.id]) >= pm_warns_count
     ):
         await m.reply_msg("PM_PERMIT_ALREADY_WARNED")
-        del PM_WARNS_ACTIVE_CACHE[m.from_user.id]
+        del pm_permit_warning_cache[m.from_user.id]
+        out = await m.reply("Blocked?", quote=True)
         return await m.from_user.block()
-    media_ = CUSTOM_PM_MEDIA.get(c.myself.id)
-    text_ = CUSTOM_PM_TEXT.get(c.myself.id)
-    id_msg = m.id
-    if text_:
-        text_ = text_.format(
-            user_id=m.from_user.id,
-            mention=m.from_user.mention,
-            user_name=m.from_user.username,
-            max_warns=pm_warns_count,
-            warns=PM_WARNS_ACTIVE_CACHE[m.from_user.id]
-            if PM_WARNS_ACTIVE_CACHE.get(m.from_user.id)
-            else 1,
-            mymention=c.myself.mention,
-        )
-    if media_ and Altruix.log_chat:
-        dtext = Altruix.config.DEFAULT_PM_TEXT.format(
-            user_id=m.from_user.id,
-            mention=m.from_user.mention,
-            user_name=m.from_user.username,
-            max_warns=pm_warns_count,
-            warns=PM_WARNS_ACTIVE_CACHE[m.from_user.id]
-            if PM_WARNS_ACTIVE_CACHE.get(m.from_user.id)
-            else 1,
-            mymention=c.myself.mention,
-        )
-        out = await c.copy_message(
-            m.chat.id,
-            Altruix.log_chat,
-            int(media_),
-            text_ or dtext,
-            reply_to_message_id=id_msg,
-        )
-    elif text_:
-        out = await m.reply(text_, quote=True)
+
+    if m.from_user.id not in pm_permit_warning_cache:
+        pm_permit_warning_cache[m.from_user.id] = 1
     else:
-        path_ = "./custom_files/pmpermit.*"
-        photo_ = (
-            glob.glob(path_)[0] if glob.glob(path_) else Altruix.config.DEFAULT_PM_IMAGE
-        )
-        text_ = Altruix.config.DEFAULT_PM_TEXT.format(
-            user_id=m.from_user.id,
-            mention=m.from_user.mention,
-            user_name=m.from_user.username,
-            max_warns=pm_warns_count,
-            warns=PM_WARNS_ACTIVE_CACHE[m.from_user.id]
-            if PM_WARNS_ACTIVE_CACHE.get(m.from_user.id)
-            else 1,
-            mymention=c.myself.mention,
-        )
-        out = await m.reply_file(photo_, caption=text_, quote=True)
-    if m.from_user.id not in PM_WARNS_ACTIVE_CACHE:
-        PM_WARNS_ACTIVE_CACHE[m.from_user.id] = 1
-    else:
-        PM_WARNS_ACTIVE_CACHE[m.from_user.id] += 1
-    if m.from_user.id in LPM:
-        await LPM[m.from_user.id]._delete()
-    LPM[m.from_user.id] = out
+        pm_permit_warning_cache[m.from_user.id] += 1
+    if m.from_user.id in whatever_this_shit_is:
+        await whatever_this_shit_is[m.from_user.id]._delete()
+    whatever_this_shit_is[m.from_user.id] = out

@@ -25,10 +25,18 @@ afk_sanity_check: dict = {}
     cmd_help={
         "help": "Set AFK.",
         "example": "afk i am currently outside ",
-        "user_args": {
-            "hls": "Hides last seen in afk.",
-            "dlm": "Doesn't logs mentioned messages.",
-        },
+        "user_args": [
+            {
+                "arg": "hls",
+                "help": "Hides last seen in afk.",
+                "requires_input": False
+            },
+            {
+                "arg": "dlm",
+                "help": "Doesn't logs mentioned messages.",
+                "requires_input": False
+            },
+        ]
     },
 )
 async def afk(c: Client, m: Message):
@@ -45,8 +53,8 @@ async def afk(c: Client, m: Message):
                 "$set": {
                     "afk_time": afk_time,
                     "reason": reason,
-                    "dlm": "-dlm" in user_args,
-                    "hls": "-hls" in user_args,
+                    "dlm": "dlm" in user_args,
+                    "hls": "hls" in user_args,
                 }
             },
         )

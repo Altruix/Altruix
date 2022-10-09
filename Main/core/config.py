@@ -62,41 +62,22 @@ class BaseConfig(object):
     HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
     HELP_MENU_ROWS = int(getenv("HELP_MENU_ROWS", 6))
     HELP_MENU_COLUMNS = int(getenv("HELP_MENU_COLUMNS", 3))
-    AUTOAPPROVE = getenv("AUTOAPPROVE", True)
+
     DEFAULT_REPO = "https://github.com/Altruix/Altruix"
     HEROKU_API_KEY = getenv("HEROKU_API_KEY")
     REPO = getenv("CUSTOM_REPO") or DEFAULT_REPO
-    DEFAULT_PM_IMAGE = "./Main/assets/images/pmpermit.jpg"
-    DEFAULT_PM_TEXT = """<b>Altruix's PM BOT</b>
-<i>Hello, {mention}. Welcome to {mymention}'s PM. Please State your concern and wait for him to respond.</i>
 
-<i>You currently <code>{warns}/{max_warns}</code> Warnings. If you end up exceeding warn limit you will be directly blocked until further notice!</i>
-"""
-    APPROVED_DICT: dict = {}
-    CUSTOM_PM_TEXT: dict = {}
     UPDATE_ON_STARTUP = (
         False
         if (getenv("UPDATE_ON_STARTUP", "yes").lower() in ["n", "nope", "false"])
         else True
     )
-    CUSTOM_PM_MEDIA: dict = {}
-    PM_WARNS_DICT: dict = {}
     DB_NAME = "mongo"
-    PM_MEDIA = getenv("PM_MEDIA")
     DB_URI = getenv("DB_URI")
     RESOURCE_SAVER = getenv("RESOURCE_SAVER") or "true"
     DEBUG = True if getenv("DEBUG", "false").lower() == "true" else False
     LOG_CHAT_ID = digit_wrap(getenv("LOG_CHAT_ID", None))
-    PM_ENABLE = (
-        False
-        if (
-            getenv("ENABLE_PM_PERMIT")
-            and getenv("ENABLE_PM_PERMIT").lower() in ["false", "n", "no", "disable"]
-        )
-        else True
-    )
     UB_LANG = getenv("UB_LANG")
-    GEAR_THUMB = "https://telegra.ph/file/8ac4bcd5d2bd62f5f7a7a.png"
     SUDO_CMD_HANDLER = getenv("SUDO_CMD_HANDLER") or "!"
     CMD_HANDLER = getenv("CMD_HANDLER") or "."
     try:
@@ -225,7 +206,7 @@ class Config(BaseConfig):
         return (
             await self.get_env_from_db(env_key)
             or self.get_env_(env_key, as_list)
-            or getattr(self, env_key)
+            or super().__getattribute__(env_key)
         )
 
     def get_env_(self, env_key, as_list):
@@ -238,7 +219,6 @@ class Config(BaseConfig):
 
     async def get_env_from_db(self, env_name):
         if var := await self.env_col.find_one({"_id": env_name}):
-            self.__setattr__(env_name, var.get("env_value"))
             return (
                 list(var.get("env_value"))
                 if isinstance(var.get("env_value"), list)
@@ -348,13 +328,6 @@ class Config(BaseConfig):
             {"_id": "SUDO_USERS"}, {"$pull": {"user_id": int(user_id)}}
         )
 
-    async def pm_enable(self):
-        self.PM_PERMIT = True
-        await self.add_env_to_db("PM_PERMIT", True)
-
-    async def pm_disable(self):
-        self.PM_PERMIT = False
-        await self.sync_env_to_db("PM_PERMIT", False)
 
     async def get_pm_sts(self):
         if await self.get_env_from_db("PM_PERMIT"):

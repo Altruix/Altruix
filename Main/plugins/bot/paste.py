@@ -106,7 +106,7 @@ async def paste_inline_handler(_, iq: InlineQuery):
                 InlineQueryResultArticle(
                     title=f"Paste {url}",
                     description="Paste Internal Function",
-                    thumb_url=Altruix.config.GEAR_THUMB,
+                    thumb_url="https://telegra.ph/file/8ac4bcd5d2bd62f5f7a7a.png",
                     input_message_content=InputTextMessageContent(
                         Altruix.get_string("PASTE_TEXT").format(url, "bin"),
                     ),

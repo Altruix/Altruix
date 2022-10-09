@@ -14,7 +14,7 @@ from pyrogram import Client, filters
 from Main.core.types.message import Message
 from Main.core.decorators import log_errors, iuser_check, inline_check
 from pyrogram.types import (
-    Message, InlineQuery, CallbackQuery, InlineKeyboardButton,
+    InlineQuery, CallbackQuery, InlineKeyboardButton,
     InlineKeyboardMarkup, InputTextMessageContent, InlineQueryResultArticle)
 
 
@@ -107,19 +107,23 @@ async def ping_inline_handler(_, iq: InlineQuery):
 
 
 @Altruix.register_on_cmd(
-    ["restart", "reload"],
+    "restart",
     bot_mode_unsupported=True,
     cmd_help={
         "help": "Restarts the userbot",
         "example": "restart",
-        "user_args": {
-            "r": "Just reloads the plugins instead of performing a full restart."
-        },
+        "user_args": [
+            {
+                "arg": "soft",
+                "help": "Just reloads the plugins instead of performing a full restart.",
+                "requires_input": False
+            },
+        ]
     },
 )
 @inline_check
 async def restart_ub_cmd(c: Client, m: Message):
-    reload = m.command == "reload"
+    reload = m.user_args and m.user_args.soft
     rm = m.reply_to_message
     results = await c.get_inline_bot_results(
         Altruix.bot_info.username, "reload" if reload else "restart"

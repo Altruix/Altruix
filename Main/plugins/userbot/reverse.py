@@ -27,7 +27,13 @@ from Main.utils.file_helpers import run_in_exc
     cmd_help={
         "help": "Reverses replied image on (Google | Yahoo).",
         "example": "reverse (reply to photo | sticker | image)",
-        "user_args": {"yandex": "Use yandex as a method to reverse search"},
+        "user_args": [
+            {
+                "arg": "p",
+                "help": "Search Engine Provider. (google/yandex)",
+                "requires_input": True
+            },
+        ],
     },
     requires_reply=True,
 )
@@ -44,7 +50,7 @@ async def reverse_search_func_(c: Client, m: Message):
         )
     ):
         photo = await m.reply_to_message.download("reverse_.png")
-        if m.user_args and (all(item in ["-yandex", "-y"] for item in m.user_args)):
+        if m.user_args and m.user_args.y and m.user_args.y.lower() == "yandex":
             img_search_url = await reverse_search_in_yandex(photo).parse()
             if not img_search_url:
                 return await msg.edit_msg(

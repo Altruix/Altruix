@@ -33,7 +33,7 @@ async def lang_modify(c: Client, m):
 
 @Altruix.register_on_cmd(["help"], bot_mode_unsupported=True)
 async def help_normal(c: Client, m):
-    cmd_lists = Altruix.CLIST
+    cmd_lists = Altruix._command_help_message_data
     user_input = m.user_input
     chat = m.chat.id
     rm = m.reply_to_message

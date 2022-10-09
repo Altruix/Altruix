@@ -147,7 +147,7 @@ async def mute(c: Client, m: Message):
     "unmute",
     cmd_help={
         "help": "Re-allow user to message in the chat",
-        "example": "unmute <reply/username/id>",
+        "example": "unmute (reply/username/id)",
     },
     group_only=True,
 )
@@ -201,16 +201,18 @@ async def kick(c: Client, m: Message):
     cmd_help={
         "help": "promote a user in the group chat with specific permissions.",
         "example": "promote (username | reply to user)",
-        "user_args": {
-            "cci": "Can change info",
-            "cdm": "Can delete messages",
-            "ciu": "Can invite members.",
-            "cpm": "Can pin messages",
-            "crm": "Can restrict members",
-            "pro": "Can promote members",
-            "cmvc": "Can manage voice chat",
-            "anon": "Make user anonymous",
-        },
+        "user_args": [
+            {
+                "arg": "perms",
+                "help": "It can be (cci/cdm/ciu/cpm/cprm/cmvc/anon) separated by space.",
+                "requires_input": True
+            },
+            {
+                "arg": "title",
+                "help": "Admin title. Defaults to 'Admin'",
+                "requires_input": True
+            },
+        ]
     },
     group_only=True,
     disallow_if_sender_is_channel=True,
@@ -218,18 +220,57 @@ async def kick(c: Client, m: Message):
 @check_perm("can_promote_members", return_perm=True)
 async def promote(c: Client, m: Message, my_perms: ChatPermissions):
     ms = await m.handle_message("PROCESSING")
-    user_, a_title, is_chnnl = m.get_user
+    user_, __, _ = m.get_user
     args = m.user_args
+    
+    can_change_info = False
+    can_delete_messages = False
+    can_invite_users = False
+    can_pin_messages = False
+    can_promote_members = False
+    can_restrict_members = False
+    can_manage_chat = False
+    can_manage_video_chats = False
+    admin_title = arg.title or "Admin"
+    if not args:
+        can_change_info = my_perms["can_change_info"]
+        can_delete_messages = my_perms["can_delete_messages"]
+        can_invite_users = my_perms["can_invite_users"]
+        can_pin_messages = my_perms["can_pin_messages"]
+        can_promote_members = my_perms["can_promote_members"]
+        can_restrict_members = my_perms["can_restrict_members"]
+        can_manage_chat = my_perms["can_manage_chat"]
+        can_manage_video_chats =  my_perms["can_manage_voice_chats"]
+    else:
+        for arg in args:
+            if arg.key.lower() == "cci":
+                can_change_info = True
+            if arg.key.lower() == "cdm":
+                can_delete_messages = True
+            if arg.key.lower() == "ciu":
+                can_invite_users = True
+            if arg.key.lower() == "cpm":
+                can_pin_messages = True
+            if arg.key.lower() == "pro":
+                can_promote_members = True
+            if arg.key.lower() == "crm":
+                can_restrict_members = True
+            if arg.key.lower() == "cmc":
+                can_manage_chat = True
+            if arg.key.lower() == "cmvc":
+                can_manage_video_chats = True
+            if arg.key.lower() == "anon":
+                is_anonymous = True
     permissions = ChatPrivileges(
-        can_change_info="-cci" in args or my_perms["can_change_info"],
-        can_delete_messages="-cdm" in args or my_perms["can_delete_messages"],
-        can_invite_users="-ciu" in args or my_perms["can_invite_users"],
-        can_pin_messages="-cpm" in args or my_perms["can_pin_messages"],
-        can_promote_members="-pro" in args or my_perms["can_promote_members"],
-        can_restrict_members="-crm" in args or my_perms["can_restrict_members"],
-        can_manage_chat="-cmc" in args or my_perms["can_manage_chat"],
-        can_manage_video_chats="-cmvc" in args or my_perms["can_manage_voice_chats"],
-        is_anonymous="-anon" in args,
+        can_change_info=can_change_info,
+        can_delete_messages=can_delete_messages,
+        can_invite_users=can_invite_users,
+        can_pin_messages=can_pin_messages,
+        can_promote_members=can_promote_members,
+        can_restrict_members=can_restrict_members,
+        can_manage_chat=can_manage_chat,
+        can_manage_video_chats=can_manage_video_chats,
+        is_anonymous=is_anonymous,
     )
     if not user_:
         return await ms.edit_msg("INVALID_USER")
@@ -239,11 +280,11 @@ async def promote(c: Client, m: Message, my_perms: ChatPermissions):
         )
     except Exception as e:
         return await ms.edit_msg("PROMOTE_FAILED", string_args=(e))
-    if a_title and m.chat.type == "supergroup":
+    if admin_title and m.chat.type == "supergroup":
         with contextlib.suppress(Exception):
-            await c.set_administrator_title(m.chat.id, user_, a_title)
-    user_info, a_title = await c.get_users(user_), a_title or "Admin"
-    await ms.edit_msg("PROMOTED", string_args=(user_info.mention, a_title))
+            await c.set_administrator_title(m.chat.id, user_, admin_title)
+    user_info = await c.get_users(user_)
+    await ms.edit_msg("PROMOTED", string_args=(user_info.mention, admin_title))
 
 
 @Altruix.register_on_cmd(
@@ -288,7 +329,7 @@ async def promote(c: Client, m: Message):
     ["del", "delete"],
     cmd_help={
         "help": "Delete the replied message",
-        "example": "del <reply to message>",
+        "example": "del (reply to message)",
     },
     requires_reply=True,
 )

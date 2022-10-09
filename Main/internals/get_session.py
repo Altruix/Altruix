@@ -36,7 +36,7 @@ async def start_command_handler(_, m: Message):
             reply_markup=ReplyKeyboardRemove(),
             send_msg_if_file_invalid=True,
         )
-        if Altruix.traning_wheels_protocol and m.from_user.id in Altruix.auth_users:
+        if Altruix.training_wheels_protocol and m.from_user.id in Altruix.auth_users:
             await m.reply(
                 "You'll have to add a user session to disable TWP, would you like to proceed?",
                 reply_markup=ReplyKeyboardMarkup(

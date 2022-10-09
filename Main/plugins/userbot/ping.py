@@ -23,13 +23,19 @@ from pyrogram.errors import ChatSendInlineForbidden
     cmd_help={
         "help": "Ping userbot",
         "example": "ping",
-        "user_args": {"c": "Use classic way to ping, instead of inline"},
+        "user_args": [
+                        {
+                "arg": "c",
+                "help": "show the ping output as a regular text edit.",
+                "requires_input": False
+            },
+],
     },
 )
 @inline_check
 async def ping_ub_cmd(c: Client, m: Message):
     user_args = m.user_args
-    if "-c" not in user_args:
+    if "c" not in user_args:
         rm = m.reply_to_message
         try:
             results = await c.get_inline_bot_results(Altruix.bot_info.username, "ping")

@@ -16,7 +16,11 @@ from Main.core.types.message import Message
     cmd_help={
         "help": "Updates your userbot bot.",
         "example": "update",
-        "user_args": {"-changelog": "Generate and shows changelog."},
+        "user_args": [{
+                "arg": "changelog",
+                "help": "Generate and shows changelog.",
+                "requires_input": False
+            }],
     },
 )
 async def update(client, message: Message):
@@ -26,7 +30,7 @@ async def update(client, message: Message):
     )
     await msg.edit_msg("UPDATING")
     repo = await updater_.init_repo()
-    if "-changelog" in message.user_args:
+    if message.user_args.changelog:
         repo = await updater_.init_repo()
         if cl := await updater_.gen_changelog(repo, message, Altruix.config.REPO):
             cl = f"<b>Change-log for Altruix <i>v{Altruix.__version__}</i></b> \n{cl}"

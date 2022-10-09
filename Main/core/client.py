@@ -13,6 +13,7 @@ import time
 import yaml
 import shlex
 import random
+import html
 import shutil
 import asyncio
 import inspect
@@ -58,7 +59,6 @@ class AltruixClient:
         self.clients: List[Client] = []
         self.cmd_list = {}
         self.all_lang_strings = {}
-        self.auto_approve = False
         self.__version__ = "0.0.2"
         self.selected_lang = "english"
         self.local_lang_file = "./Main/localization"
@@ -72,7 +72,7 @@ class AltruixClient:
         self.loaded_bot_cmds = False
         Session.notice_displayed = True
         self.cmd_list_s = []
-        self.traning_wheels_protocol = False
+        self.training_wheels_protocol = False
         self._init_logger()
         self.config = BaseConfig
         self.local_db = LocalDatabase()
@@ -81,14 +81,13 @@ class AltruixClient:
         self.executor = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count() * 5)
         self.config = Config(self.db.env_col, loop=self.loop, executor=self.executor)
         self.log_chat = None
-        self.CLIST = {}
+        self._command_help_message_data = {}
         self.loop.run_until_complete(self._setup(restart=False, *args, **kwargs))
 
     async def update_cache(self):
         cache = Cache(self.config, self.db, self.clients)
         await cache.update_auto_post_cache()
-        await cache.update_approved_list_on_startup()
-        await cache.init_all_custom_files()
+        # await cache.init_all_custom_files()
 
     @property
     def banner(self):
@@ -299,24 +298,20 @@ class AltruixClient:
         group=1,
         disallow_if_sender_is_channel=False,
     ):
-        cmd_help_ = cmd_help.get("help") or "Not Given"
-        cmd_help_ex = cmd_help.get("example") or "Not Given"
-        user_args = dict(cmd_help.get("user_args")) if cmd_help.get("user_args") else {}
-        cmd = cmd if isinstance(cmd, list) else [cmd]
+        if type(cmd) == str:
+            cmd =  [cmd]
         self.cmd_list_s.extend(cmd)
         previous_stack_frame = inspect.stack()[1]
         file_name = os.path.basename(previous_stack_frame.filename.replace(".py", ""))
-        self.add_help_to_cmdlist(
-            cmd=cmd,
+        self.add_help_to_command_list(
+            commands=cmd,
             file_name=file_name,
-            cmd_help=cmd_help_,
-            example=cmd_help_ex,
-            user_args=user_args,
+            help_map=cmd_help,
             requires_input=requires_input,
             requires_reply=requires_reply,
             group_only=group_only,
             channel_only=channel_only,
-            pm_only=pm_only,
+            private_only=pm_only,
         )
 
         def decorator(func):
@@ -370,7 +365,7 @@ class AltruixClient:
                             raise _be from e
 
             disabled_sudo = False
-            if not self.traning_wheels_protocol:
+            if not self.training_wheels_protocol:
                 if disabled_sudo := (
                     all(
                         (
@@ -393,48 +388,48 @@ class AltruixClient:
 
         return decorator
 
-    def add_help_to_cmdlist(
+    def add_help_to_command_list(
         self,
-        cmd: List[str],
+        commands: Union[List[str], str],
         file_name: str,
-        cmd_help: dict,
-        example,
-        user_args,
-        requires_input,
-        requires_reply,
-        group_only,
-        channel_only,
-        pm_only,
+        help_map: dict,
+        requires_input: bool,
+        requires_reply: bool,
+        group_only: bool,
+        channel_only: bool,
+        private_only: bool,
     ):
-        example = self.config.CMD_HANDLER + example
-        if isinstance(cmd, list):
-            cmd = cmd[0]
+        example = html.escape(help_map.get("example", "No example available"))
+        help_text = html.escape(help_map.get("help", "Sorry, No help available for this command"))
+        user_args = help_map.get("user_args")
+        if isinstance(commands, str):
+            commands = [commands]
         if file_name not in self.cmd_list:
             self.cmd_list[file_name] = [
                 {
-                    "cmd": cmd,
-                    "cmd_help": cmd_help,
+                    "commands": commands,
+                    "help": help_text,
                     "example": example,
-                    "requires_input": requires_input,
                     "user_args": user_args,
+                    "requires_input": requires_input,
                     "requires_reply": requires_reply,
                     "group_only": group_only,
                     "channel_only": channel_only,
-                    "pm_only": pm_only,
+                    "private_only": private_only,
                 }
             ]
-        elif cmd not in [x.get("cmd", "_") for x in self.cmd_list[file_name]]:
+        elif commands[0] not in [x.get("commands", [""])[0] for x in self.cmd_list[file_name]]:
             self.cmd_list[file_name].append(
                 {
-                    "cmd": cmd,
-                    "cmd_help": cmd_help,
+                    "commands": commands,
+                    "help": help_text,
                     "example": example,
-                    "requires_input": requires_input,
                     "user_args": user_args,
+                    "requires_input": requires_input,
                     "requires_reply": requires_reply,
                     "group_only": group_only,
                     "channel_only": channel_only,
-                    "pm_only": pm_only,
+                    "private_only": private_only,
                 }
             )
 
@@ -447,16 +442,16 @@ class AltruixClient:
         group=0,
         bot_mode_unsupported=False,
     ):
-        if not self.traning_wheels_protocol:
+        if not self.training_wheels_protocol:
             self.config.CMD_HANDLER
-            basic_f = (
+            basic_filters = (
                 filter_s
                 or user_filters(list(cmd), disable_sudo=disable_sudo)
                 & ~filters.via_bot
                 & ~filters.forwarded
             )
             for client in self.clients:
-                client.add_handler(MessageHandler(func_, filters=basic_f), group=group)
+                client.add_handler(MessageHandler(func_, filters=basic_filters), group=group)
         if self.bot_mode and not bot_mode_unsupported and not self.loaded_bot_cmds:
             bot_f = filter_s or filters.user(self.auth_users) & filters.command(
                 list(cmd), ["!", "/", "|"]
@@ -478,11 +473,6 @@ class AltruixClient:
             "true",
             "enable",
         }
-        self.auto_approve = str((await self.config.get_env("AUTOAPPROVE"))).lower() in {
-            "yes",
-            "true",
-            "ok",
-        }
         if not restart:
             await self.initialize_telegram_sessions(*args, **kwargs)
         await self.update_cache()
@@ -493,7 +483,7 @@ class AltruixClient:
         self.log(
             f"Altruix v{self.__version__} has been successfully deployed with pyrogram version v{pyrogram_version}!"
         )
-        if self.traning_wheels_protocol:
+        if self.training_wheels_protocol:
             self.log(
                 "Altruix is in [TWP], all the userbot features will be disabled!",
                 level=30,
@@ -506,7 +496,7 @@ class AltruixClient:
         try:
             await self.load_all_modules()
             mess = None
-            if self.traning_wheels_protocol:
+            if self.training_wheels_protocol:
                 self.log("No user session found, Running in [TWP] mode.", level=50)
             else:
                 self.log("Testing User session.", level=30)
@@ -548,7 +538,7 @@ class AltruixClient:
             self.log("Searching in DB for a user session...")
             string_sessions = await self.config.get_env_from_db("SESSIONS")
         if not string_sessions:
-            self.traning_wheels_protocol = True
+            self.training_wheels_protocol = True
             self.log(
                 "No User Session found, all the userbot features will be disabled!",
                 level=30,
@@ -596,14 +586,14 @@ class AltruixClient:
                     await self.config.pop_element_from_list("SESSIONS", each)
             if not self.clients:
                 await self.config.del_env_from_db("SESSIONS")
-                self.traning_wheels_protocol = True
+                self.training_wheels_protocol = True
 
     async def add_session(self, session: str, status: Message = None) -> Client:
         await self.config.add_element_to_list("SESSIONS", session)
         self.config.append_session(session)
         self.config.SESSIONS.append(session)
         self.log("User session added successfully!")
-        if self.traning_wheels_protocol:
+        if self.training_wheels_protocol:
             self.log("[TWP] has been disabled!")
         app = Client(
             "main_instance",
@@ -618,7 +608,7 @@ class AltruixClient:
         app.myself = session_user_info
         if not app.myself.id == self.config.OWNER_ID:
             self.ourselves.append(session_user_info)
-        self.traning_wheels_protocol = False
+        self.training_wheels_protocol = False
         await self.load_all_modules()
         self.log("Userbot plugins have been loaded.")
         if status:
@@ -633,7 +623,7 @@ class AltruixClient:
         removed_session_info = self.ourselves.pop(index)
         await self.clients.pop(index).stop()
         if not self.ourselves:
-            self.traning_wheels_protocol = True
+            self.training_wheels_protocol = True
             self.log("[TWP] has been enabled!")
         self.log("User session removed successfully!")
         self.loop.create_task(self.load_all_modules())
@@ -652,7 +642,7 @@ class AltruixClient:
             if power_hard:
                 args = [sys.executable, "-m", "Main"]
                 os.execle(sys.executable, *args, os.environ)
-            if not self.traning_wheels_protocol and not self.clients:
+            if not self.training_wheels_protocol and not self.clients:
                 for each in self.clients:
                     await each.restart()
             await self.bot.restart()
@@ -785,7 +775,7 @@ class AltruixClient:
         self.log("All internal modules have been loaded.")
         self.log("Preparing to load all plugins.\n")
         await self.load_from_directory("Main/plugins/bot/*.py", log=True)
-        if self.traning_wheels_protocol:
+        if self.training_wheels_protocol:
             self.log("Userbot Plugins will be disabled due to [TWP]!")
             if self.bot_mode:
                 await self.load_from_directory("Main/plugins/userbot/*.py", log=False)
@@ -810,27 +800,31 @@ class AltruixClient:
         self.loop.run_until_complete(self._test())
 
     def prepare_help(self):
-        self.CLIST.clear()
-        for cmd in self.cmd_list:
-            module = self.cmd_list[cmd]
-            cmd = cmd.lower()
-            self.CLIST[cmd] = ""
-            for cmds in module:
-                self.CLIST[
-                    cmd
-                ] += f"""\n<b>Command :</b> <code>{self.user_command_handler}{cmds.get('cmd')}</code>
-<b>Help :</b> <code>{cmds.get('cmd_help')}</code>
-<b>Example :</b> <code>{cmds.get('example')}</code>"""
-                if cmds.get("user_args"):
-                    self.CLIST[cmd] += f"\n<b>Args :</b> \n"
-                    user_args: dict = cmds.get("user_args")
-                    for arg in user_args:
-                        arg_ = arg
-                        if not arg.startswith("-"):
-                            arg_ = f"<code>-{arg}</code>"
-                        self.CLIST[cmd] += f">> {arg_}: {user_args[arg]}\n"
-                if cmds.get("requires_input"):
-                    self.CLIST[cmd] += f"\n<b>Input Req:</b> <code>Yes</code>"
-                if cmds.get("requires_reply"):
-                    self.CLIST[cmd] += f"\n<b>Requires Reply :</b> <code>Yes</code>"
-                self.CLIST[cmd] += "\n"
+        self._command_help_message_data.clear()
+        for plugin_name, commands_data in self.cmd_list.items():
+            plugin_name = plugin_name.lower() 
+            self._command_help_message_data[plugin_name] = ""
+            for each_command_data in commands_data:
+                commands_: List[str] = each_command_data.get("commands", ["???"])
+                help_text = each_command_data.get("help")
+                example_text = each_command_data.get("example")
+                user_args = each_command_data.get("user_args")
+                self._command_help_message_data[plugin_name] += "\n<b>Command :</b>"
+                for _cmd_str in commands_:
+                    self._command_help_message_data[plugin_name] += f"<code>{self.user_command_handler}{_cmd_str}</code>/"
+                self._command_help_message_data[plugin_name] = self._command_help_message_data[plugin_name][:-1] + "\n"
+                self._command_help_message_data[plugin_name] += f"<b>Help :</b> <i>{help_text}</i>\n"
+                self._command_help_message_data[plugin_name] += f"<b>Example :</b> <code>{self.user_command_handler}{example_text}</code>\n"
+                if user_args:
+                    self._command_help_message_data[plugin_name] += "<b>Arguments:</b>\n"
+                    for arg_data in user_args:
+                        arg_name = arg_data.get("arg")
+                        arg_help = html.escape(arg_data.get("help"))
+                        arg_requires_input = arg_data.get("requires_input")
+                        self._command_help_message_data[plugin_name] += f"   <code>-{arg_name}</code> - {arg_help}{' [need input]' if arg_requires_input else ''}\n"
+                # self._command_help_message_data[plugin_name] += f" \n"
+            
+        
+        
+        
+

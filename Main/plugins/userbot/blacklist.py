@@ -21,7 +21,12 @@ warn_count = {}
     cmd_help={
         "help": "Add a message to blacklist.",
         "example": "blacklist porn",
-        "user_args": {"w": "Set a warn limit for that blacklisted word"},
+        "user_args": [
+            {
+                "arg": "limit",
+                "help": "Set a warn limit for that blacklisted word.",
+                "requires_input": True
+            }],
     },
     requires_input=True,
 )
@@ -38,8 +43,8 @@ async def add_blacklist_cmd_handler(c: Client, m: Message):
         )
         return ""
     warns = False
-    if any("-w" in s for s in user_args):
-        warns = [x for x in user_args if x.startswith("-w")][0][2:]
+    warns = user_args.limit
+    if warns:
         if warns == "" or not warns.isdigit():
             return await m.handle_message("INVALID_BLACKLIST_SYNTAX")
         warns = int(warns)
@@ -74,7 +79,12 @@ async def list_blacklist_cmd_handler(c: Client, m: Message):
     cmd_help={
         "help": "Removes a or all the blacklisted word in the chat.",
         "example": "delbl test",
-        "user_args": {"all": "Removes all blacklisted word in the chat"},
+        "user_args": [
+            {
+                "arg": "all",
+                "help": "Removes all blacklisted word in the chat.",
+                "requires_input": False
+            }]
     },
 )
 async def delete_blacklist_cmd_handler(c: Client, m: Message):
@@ -86,7 +96,7 @@ async def delete_blacklist_cmd_handler(c: Client, m: Message):
     if not bldata:
         await processing_msg.edit_msg("NO_BLACKLIST")
         return ""
-    if "-all" in user_args:
+    if "all" in user_args:
         await bl_db.delete_many({"chat_id": m.chat.id, "client_id": my_id})
         await processing_msg.edit_msg("BL_REMOVE_ALL")
         return ""

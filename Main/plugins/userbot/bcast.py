@@ -66,7 +66,7 @@ async def bcast_remove(c: Client, m: Message):
     bot_mode_unsupported=True,
     cmd_help={
         "help": "To broadcast the replied message",
-        "example": "bcast <replyt_o_msg>",
+        "example": "bcast (reply to  a message)",
     },
     requires_reply=True,
 )

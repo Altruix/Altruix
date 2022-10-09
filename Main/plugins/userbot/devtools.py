@@ -23,14 +23,25 @@ from Main.utils.dev_func import eval_py, exec_terminal
     cmd_help={
         "help": "Gets the json of the given message object.",
         "example": "json",
-        "user_args": {
-            "p": "Pastes the output to pastebin.",
-            "f": "Force sends the output as a file.",
-            "s": "Sends the output to log chat.",
-        },
+        "user_args": [
+            {
+                "arg": "p",
+                "help": "Pastes the output to paste bin.",
+                "requires_input": False
+            },
+                                {
+                "arg": "f",
+                "help": "Force sends the output as a file.",
+                "requires_input": False
+            },
+            {
+                "arg": "s",
+                "help": "Sends the output to log chat and deletes the command.",
+                "requires_input": False
+            }],
     },
 )
-async def get_json(c: Client, m: Message):
+async def get_json_message_handler(c: Client, m: Message):
     user_args = m.user_args
     msg_id = m.id
     rm = m.reply_to_message
@@ -39,8 +50,8 @@ async def get_json(c: Client, m: Message):
     cmd_ = "<b>jsonified</b>"
     await m_.edit_msg(
         jsonified,
-        force_paste="-paste" in user_args,
-        force_file=f"message.json;{cmd_}" if "-file" in user_args else None,
+        force_paste="p" in user_args,
+        force_file=f"message.json;{cmd_}" if "f" in user_args else None,
         reply_to_message_id=msg_id,
     )
 
@@ -50,10 +61,22 @@ async def get_json(c: Client, m: Message):
     cmd_help={
         "help": "Executes the python snippet inside telegram.",
         "example": "eval print('Hello World!')",
-        "user_args": {
-            "file": "Force sends the output as a file.",
-            "paste": "Pastes the output to pastebin.",
-        },
+        "user_args": [
+            {
+                "arg": "p",
+                "help": "Pastes the output to paste bin.",
+                "requires_input": False
+            },
+                                {
+                "arg": "f",
+                "help": "Force sends the output as a file.",
+                "requires_input": False
+            },
+            {
+                "arg": "s",
+                "help": "Sends the output to log chat and deletes the command.",
+                "requires_input": False
+            }],
     },
     just_exc=True,
 )
@@ -65,8 +88,8 @@ async def evaluate_command_handler(c: Client, m: Message):
     if not cmd:
         await m_.edit_msg("INPUT_REQUIRED")
         return
-    if "-paste" in user_args or "-file" in user_args:
-        cmd = (cmd.replace("-paste", "").replace("-file", "")).strip()
+    if "p" in user_args or "f" in user_args:
+        cmd = (cmd.replace("paste", "").replace("file", "")).strip()
     results = await eval_py(c, cmd, m)
     final_output = f"<b>INPUT:</b>\n<code>{cmd}</code>\n\n<b>OUTPUT</b>:\n<code>{results.strip()}</code>"
     cmd_ = (
@@ -74,13 +97,13 @@ async def evaluate_command_handler(c: Client, m: Message):
         if len(cmd) >= 1000
         else f"<b>OUTPUT FOR COMMAND :</b> <code>{cmd}</code>"
     )
-    if "-s" in user_args and Altruix.log_chat:
-        if "-paste" in user_args:
+    if "s" in user_args and Altruix.log_chat:
+        if "p" in user_args:
             url = await Paste(final_output).paste()
             msg = await c.send_message(
                 Altruix.log_chat, f"{cmd_} \n<b>Pasted to :</b> {url}"
             )
-        elif "-file" in user_args or len(final_output) >= TGLIMITS.MESSAGE_TEXT:
+        elif "p" in user_args or len(final_output) >= TGLIMITS.MESSAGE_TEXT:
             file_path = f"out_bash_{m.id}.txt"
             async with aiofiles.open(file_path, "w") as f:
                 await f.write(final_output)
@@ -93,7 +116,7 @@ async def evaluate_command_handler(c: Client, m: Message):
     await m_.edit_msg(
         final_output,
         force_paste="-paste" in user_args,
-        force_file=f"eval_output.txt;{cmd_}" if "-file" in user_args else None,
+        force_file=f"eval_output.txt;{cmd_}" if "f" in user_args else None,
         reply_to_message_id=msg_id,
     )
 
@@ -104,10 +127,22 @@ async def evaluate_command_handler(c: Client, m: Message):
     cmd_help={
         "help": "Executes command in terminal.",
         "example": "term echo Hello World!",
-        "user_args": {
-            "file": "Force sends the output as a file.",
-            "paste": "Pastes the output to pastebin.",
-        },
+        "user_args": [
+            {
+                "arg": "p",
+                "help": "Pastes the output to paste bin.",
+                "requires_input": False
+            },
+                                {
+                "arg": "f",
+                "help": "Force sends the output as a file.",
+                "requires_input": False
+            },
+            {
+                "arg": "s",
+                "help": "Sends the output to log chat and deletes the command.",
+                "requires_input": False
+            }],
     },
 )
 async def terminal(c: Client, m: Message):
@@ -117,8 +152,8 @@ async def terminal(c: Client, m: Message):
         return await m.handle_message("TERM_INPUT_REQUIRED")
     ms_id = m.id
     m = await m.handle_message("CMD_RUNNING")
-    if "-paste" in user_args or "-file" in user_args:
-        bash_code = (bash_code.replace("-paste", "").replace("-file", "")).strip()
+    if "p" in user_args or "f" in user_args:
+        bash_code = (bash_code.replace("-p", "").replace("-f", "")).strip()
     success, output, return_code = await exec_terminal(bash_code)
     out_text = f"<b>Input</b>\n<code>{bash_code}</code>"
     _out_text = out_text
@@ -128,13 +163,13 @@ async def terminal(c: Client, m: Message):
     _out_text += f"(<code>{return_code}</code>)"
     ttwp = out_text if len(out_text) <= 3999 else None
     caption_ = out_text if len(out_text) <= 9999 else "<b>OUTPUT OF CMD EXECUTED</b>"
-    if "-s" in user_args and Altruix.log_chat:
-        if "-paste" in user_args:
+    if "s" in user_args and Altruix.log_chat:
+        if "p" in user_args:
             url = await Paste(_out_text).paste()
             msg = await c.send_message(
                 Altruix.log_chat, f"{caption_} \n<b>Pasted to :</b> {url}"
             )
-        elif "-file" in user_args or len(out_text) >= TGLIMITS.MESSAGE_TEXT:
+        elif "f" in user_args or len(out_text) >= TGLIMITS.MESSAGE_TEXT:
             file_path = f"out_bash_{m.id}.txt"
             async with aiofiles.open(file_path, "w") as f:
                 await f.write(_out_text)
@@ -165,12 +200,23 @@ async def paste_logs(log_path):
     cmd_help={
         "help": "Retrieve logs of the bot.",
         "example": "logs",
-        "user_args": {
-            "paste": "Pastes logs to a pastebin.",
-            "s": "Silently sends logs to log chat.",
-            "r": "Resets logs.",
-        },
-    },
+        "user_args": 
+            [
+            {
+                "arg": "p",
+                "help": "Pastes the logs to paste bin.",
+                "requires_input": False
+            },
+                                {
+                "arg": "s",
+                "help": "Silently sends logs to log chat.",
+                "requires_input": False
+            },
+            {
+                "arg": "r",
+                "help": "Resets logs.",
+                "requires_input": False
+            }],}
 )
 async def logs(c: Client, m: Message):
     log_file_ = "altruix.log"
@@ -185,12 +231,12 @@ async def logs(c: Client, m: Message):
     file_size_ = os.stat(log_file_).st_size
     if file_size_ == 0:
         return await MSG.edit_msg("ERROR_404_NO_LOG_FILE")
-    if "-r" in log__args_:
+    if "r" in log__args_:
         with open(log_file_, "w") as log_file:
             log_file.write("")
         info("Logs have been reset!")
         return await MSG.edit_msg("LOGS_RESET")
-    if "-s" in log__args_ and Altruix.log_chat:
+    if "s" in log__args_ and Altruix.log_chat:
         msg = (
             await c.send_document(
                 Altruix.log_chat,
@@ -198,13 +244,13 @@ async def logs(c: Client, m: Message):
                 file_name="AltruiX_logs.txt",
                 caption="LOGS of your Altruix Userbot.",
             )
-            if "_paste" not in log__args_
+            if "p" not in log__args_
             else await c.send_message(Altruix.log_chat, (await paste_logs(log_file_)))
         )
         return await MSG.edit_msg(
             f"**LOGS HERE :** [VIEW]({msg.link})", parse_mode=enums.ParseMode.MARKDOWN
         )
-    if "_paste" in log__args_:
+    if "p" in log__args_:
         return await MSG.edit_msg(await paste_logs(log_file_))
     msg = await c.send_document(
         m.chat.id,

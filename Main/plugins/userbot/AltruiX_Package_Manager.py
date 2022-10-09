@@ -19,7 +19,11 @@ packages_list = Altruix.db.make_collection("packages")
     cmd_help={
         "example": "apm_install vcplayer",
         "help": "install packages made for altruix.",
-        "user_args": {"-ios": "install package on startup!"},
+        "user_args": [{
+                "arg": "ios",
+                "help": "Install package on startup.",
+                "requires_input": False
+            },],
     },
     requires_input=True,
 )
@@ -41,7 +45,7 @@ async def install_pack(c, m: Message):
     await msg.edit_msg(
         "INSTALLED_PACKAGE", string_args=(resp.Name, resp.developer, resp.version)
     )
-    if "-ios" in m.user_args:
+    if "ios" in m.user_args:
         if pl := await packages_list.find_one({"_id": "APM"}):
             if (
                 pl

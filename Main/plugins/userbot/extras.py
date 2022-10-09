@@ -93,12 +93,18 @@ def get_info(value=False) -> tuple:
     cmd_help={
         "help": "Get info about your machine.",
         "example": "ubstat",
-        "user_args": {"a": "Reveal all info - IP and MAC"},
+        "user_args": [
+            {
+                "arg": "a",
+                "help": "Reveal all info - IP and MAC.",
+                "requires_input": False
+            },
+        ],
     },
 )
 async def sTATS(c: Altruix, m: Message):
     msg = await m.handle_message("PROCESSING")
-    value = m.user_args and (all(item in ["-all", "-a"] for item in m.user_args))
+    value = m.user_args and m.user_args.a
     ub_stat = await get_info(value)
     database_ = await Altruix.db._db_name.command("dbstats")
     s = tuple(ub_stat) + (
