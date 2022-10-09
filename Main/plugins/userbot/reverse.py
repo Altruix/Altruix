@@ -20,7 +20,7 @@ from urllib import parse as u_parse
 from Main.core.types.message import Message
 from os import path as o_path, remove as rmv
 from Main.utils.file_helpers import run_in_exc
-
+from io import BytesIO
 
 @Altruix.register_on_cmd(
     ["reverse", "ris", "gris", "grs", "gis"],
@@ -49,7 +49,7 @@ async def reverse_search_func_(c: Client, m: Message):
             and c.guess_mime_type(rm.document.file_name).startswith("image/")
         )
     ):
-        photo = await m.reply_to_message.download("reverse_.png")
+        photo = await m.reply_to_message.download(in_memory=True)
         if m.user_args and m.user_args.y and m.user_args.y.lower() == "yandex":
             img_search_url = await reverse_search_in_yandex(photo).parse()
             if not img_search_url:
@@ -75,7 +75,6 @@ async def reverse_search_func_(c: Client, m: Message):
             else:
                 return await msg.edit_msg("GOOGLE_NOT_FOUND")
             end = pc()
-            rmv(photo)
             return await msg.edit_msg(
                 "GOOGLE_RESULT",
                 string_args=(
@@ -99,17 +98,13 @@ user_agent = random.choice(
 user_agent = {"User-agent": user_agent}
 
 
-def convert_to_png(img_path):
-    name = "google_.png"
-    if os.path.exists(name):
-        os.remove(name)
-    try:
-        image = Image.open(img_path)
-    except OSError:
-        return None
-    image.save(name, "PNG")
+def convert_to_png(input_image: BytesIO) -> BytesIO:
+    out = BytesIO()
+    out.name = "google_.png"
+    image = Image.open(input_image)
+    image.save(out, "PNG")
     image.close()
-    return name
+    return out
 
 
 class reverse_search_in_yandex:
@@ -118,12 +113,12 @@ class reverse_search_in_yandex:
 
     @run_in_exc
     def parse(self):
-        photo = self.photo
+        photo: BytesIO = self.photo
         photo = convert_to_png(photo)
         if photo is None:
             return None
         search_URL = "https://yandex.com/images/search"
-        files = {"upfile": ("blob", open(photo, "rb"), "image/jpeg")}
+        files = {"upfile": ("blob", photo, "image/png")}
         parameters = {
             "rpt": "imageview",
             "format": "json",
@@ -141,8 +136,8 @@ class reverse_search_in_yandex:
 
 
 class reverse_search_in_google:
-    def __init__(self, photo) -> None:
-        self.photo = photo
+    def __init__(self, photo: BytesIO) -> None:
+        self.photo: BytesIO = photo
 
     async def reverse(self):
         url = await self.get_img_search_result()
@@ -152,17 +147,10 @@ class reverse_search_in_google:
 
     @run_in_exc
     def get_img_search_result(self):
-        img = self.photo
-        name = convert_to_png(img)
-        if name is None:
-            return None
-        if o_path.exists(img):
-            rmv(img)
+        self.photo.seek(0)
         searchUrl = "https://www.google.com/searchbyimage/upload"
-        multipart = {"encoded_image": (name, open(name, "rb"))}
+        multipart = {'encoded_image': (self.photo.name, self.photo), 'image_content': ''}
         response = r_post(searchUrl, files=multipart, allow_redirects=False)
-        if o_path.exists(name):
-            rmv(name)
         if response.status_code == 400:
             return None
         return response.headers.get("Location")
@@ -183,3 +171,5 @@ class reverse_search_in_google:
             results["best_guess"] = best.get_text()
         results["url"] = url_
         return results
+
+
