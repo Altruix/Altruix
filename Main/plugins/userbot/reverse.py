@@ -6,21 +6,21 @@
 #
 # All rights reserved.
 
-import os
 import random
 import requests
 from PIL import Image
+from io import BytesIO
 from Main import Altruix
 from pyrogram import Client
+from os import remove as rmv
 from bs4 import BeautifulSoup
 from json import loads as j_loads
 from requests import post as r_post
 from time import perf_counter as pc
 from urllib import parse as u_parse
 from Main.core.types.message import Message
-from os import path as o_path, remove as rmv
 from Main.utils.file_helpers import run_in_exc
-from io import BytesIO
+
 
 @Altruix.register_on_cmd(
     ["reverse", "ris", "gris", "grs", "gis"],
@@ -149,7 +149,10 @@ class reverse_search_in_google:
     def get_img_search_result(self):
         self.photo.seek(0)
         searchUrl = "https://www.google.com/searchbyimage/upload"
-        multipart = {'encoded_image': (self.photo.name, self.photo), 'image_content': ''}
+        multipart = {
+            "encoded_image": (self.photo.name, self.photo),
+            "image_content": "",
+        }
         response = r_post(searchUrl, files=multipart, allow_redirects=False)
         if response.status_code == 400:
             return None
@@ -171,5 +174,3 @@ class reverse_search_in_google:
             results["best_guess"] = best.get_text()
         results["url"] = url_
         return results
-
-

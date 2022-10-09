@@ -262,7 +262,9 @@ async def pm_permit_new_message_listener_handler(c: Client, m: Message):
         del pm_permit_warning_cache[m.from_user.id]
         return await m.from_user.block()
     else:
-        out = await m.reply_msg("<i>Hello there, This is an automated message. I'll respond soon.</i>")
+        out = await m.reply_msg(
+            "<i>Hello there, This is an automated message. I'll respond soon.</i>"
+        )
     if m.from_user.id not in pm_permit_warning_cache:
         pm_permit_warning_cache[m.from_user.id] = 1
     else:
