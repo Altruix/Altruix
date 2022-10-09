@@ -7,9 +7,7 @@
 # All rights reserved.
 
 
-import os
 import logging
-from ..utils.startup_helpers import custom_init
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +29,8 @@ class Cache:
     #     if pm_media := await self.config.get_env("PM_MEDIA"):
     #         await custom_init(pm_media, suffix_file="pmpermit", to_path=path_)
     #     if bot_st_media := await self.config.get_env("CUSTOM_BOT_MEDIA"):
-    #         await custom_init(bot_st_media, suffix_file="bot_st_media", to_path=path_)
+    # await custom_init(bot_st_media, suffix_file="bot_st_media",
+    # to_path=path_)
 
     async def update_auto_post_cache(self):
         auto_post_db = self.db.make_collection("auto_post_s")

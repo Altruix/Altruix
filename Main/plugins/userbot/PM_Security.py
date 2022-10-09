@@ -6,20 +6,17 @@
 #
 # All rights reserved.
 
-import glob
 
-from click import edit
 from Main import Altruix
-from ...core.config import Config
 from pyrogram.types import Message
 from pyrogram import Client, filters
 from ...core.types.message import Message
 
 
-
 pm_permit_warning_cache = {}
 whatever_this_shit_is = {}
 pm_permit_col = Altruix.db.make_collection("pm_permit")
+
 
 @Altruix.register_on_cmd(
     "approve",
@@ -52,7 +49,9 @@ async def approve_user_pm_permit_func(c: Client, m: Message):
         await pm_permit_col.insert_one({"user_id": user_id, "approved": True})
     else:
         if user_info.get("approved", False):
-            await pm_permit_col.update_one({"user_id": user_id}, {"$set": {"approved": True}})
+            await pm_permit_col.update_one(
+                {"user_id": user_id}, {"$set": {"approved": True}}
+            )
         else:
             return await msg.edit_msg("ALREADY_APPROVED")
     await msg.edit_msg("APPROVED", string_args=(user_.mention))
@@ -89,12 +88,21 @@ async def disapprove_user_pm_permit_func(c: Client, m: Message):
     user_id = user_.id
     user_info = await pm_permit_col.find_one({"user_id": user_id})
     if not user_info:
-        await pm_permit_col.insert_one({"user_id": user_id, "approved": False, "action_user_id": c.myself.id, "is_global": False})
+        await pm_permit_col.insert_one(
+            {
+                "user_id": user_id,
+                "approved": False,
+                "action_user_id": c.myself.id,
+                "is_global": False,
+            }
+        )
     else:
         if user_info.get("approved", False):
             return await msg.edit_msg("ALREADY_DISAPPROVED")
         else:
-            await pm_permit_col.update_one({"user_id": user_id}, {"$set": {"approved": False}})
+            await pm_permit_col.update_one(
+                {"user_id": user_id}, {"$set": {"approved": False}}
+            )
     await msg.edit_msg("DIS_APPROVED", string_args=(user_.mention))
 
 
@@ -203,16 +211,8 @@ async def disapprove_user_pm_permit_func(c: Client, m: Message):
         "help": "Changes Status Of PM Permit",
         "example": "pmpermit -y or -n",
         "user_args": [
-                        {
-                "arg": "y",
-                "help": "Enables Pm Permit.",
-                "requires_input": False
-            },
-                                                {
-                "arg": "n",
-                "help": "Disables Pm Permit.",
-                "requires_input": False
-            },
+            {"arg": "y", "help": "Enables Pm Permit.", "requires_input": False},
+            {"arg": "n", "help": "Disables Pm Permit.", "requires_input": False},
         ],
     },
 )
@@ -228,9 +228,11 @@ async def pm_permit_command_handler(c: Client, m: Message):
         await c.send_message(Altruix.log_chat, f"**#Pm Permit**\n\nStatus: `Enabled`")
         await m.reply_msg("Pm Security Status: `Enabled`")
     else:
-        await m.reply_msg("Current PM security status: <code>{}</code>".format(
-            "Enabled" if await Altruix.config.get_env("PM_PERMIT") else "Disabled"
-        ))
+        await m.reply_msg(
+            "Current PM security status: <code>{}</code>".format(
+                "Enabled" if await Altruix.config.get_env("PM_PERMIT") else "Disabled"
+            )
+        )
 
 
 @Altruix.on_message(

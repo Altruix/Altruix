@@ -84,13 +84,14 @@ async def listdir_cmd_handler(c: Client, m: Message):
             {
                 "arg": "d",
                 "help": "to remove a directory from the system.",
-                "requires_input": False
+                "requires_input": False,
             },
             {
                 "arg": "a",
                 "help": "to remove files of the same type from a directory.",
-                "requires_input": False
-            }]
+                "requires_input": False,
+            },
+        ],
     },
     requires_input=True,
 )

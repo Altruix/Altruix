@@ -14,8 +14,8 @@ from pyrogram import Client, filters
 from Main.core.types.message import Message
 from Main.core.decorators import log_errors, iuser_check, inline_check
 from pyrogram.types import (
-    InlineQuery, CallbackQuery, InlineKeyboardButton,
-    InlineKeyboardMarkup, InputTextMessageContent, InlineQueryResultArticle)
+    InlineQuery, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
+    InputTextMessageContent, InlineQueryResultArticle)
 
 
 @Altruix.bot.on_callback_query(filters.regex("^(restart|reload)_confirm"))
@@ -116,9 +116,9 @@ async def ping_inline_handler(_, iq: InlineQuery):
             {
                 "arg": "soft",
                 "help": "Just reloads the plugins instead of performing a full restart.",
-                "requires_input": False
+                "requires_input": False,
             },
-        ]
+        ],
     },
 )
 @inline_check

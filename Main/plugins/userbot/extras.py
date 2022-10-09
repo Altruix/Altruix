@@ -97,7 +97,7 @@ def get_info(value=False) -> tuple:
             {
                 "arg": "a",
                 "help": "Reveal all info - IP and MAC.",
-                "requires_input": False
+                "requires_input": False,
             },
         ],
     },

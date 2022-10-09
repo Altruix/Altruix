@@ -31,7 +31,7 @@ from Main.utils.file_helpers import run_in_exc
             {
                 "arg": "p",
                 "help": "Search Engine Provider. (google/yandex)",
-                "requires_input": True
+                "requires_input": True,
             },
         ],
     },

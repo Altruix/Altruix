@@ -98,9 +98,9 @@ async def add_sudo_func(c: Client, m: Message):
             {
                 "arg": "a",
                 "help": "Removes all sudos from the db.",
-                "requires_input": False
+                "requires_input": False,
             },
-            ],
+        ],
     },
 )
 async def rm_sudo_func(c: Client, m: Message):

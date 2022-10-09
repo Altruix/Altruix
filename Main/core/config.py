@@ -328,7 +328,6 @@ class Config(BaseConfig):
             {"_id": "SUDO_USERS"}, {"$pull": {"user_id": int(user_id)}}
         )
 
-
     async def get_pm_sts(self):
         if await self.get_env_from_db("PM_PERMIT"):
             return True

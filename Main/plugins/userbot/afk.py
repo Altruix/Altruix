@@ -26,17 +26,13 @@ afk_sanity_check: dict = {}
         "help": "Set AFK.",
         "example": "afk i am currently outside ",
         "user_args": [
-            {
-                "arg": "hls",
-                "help": "Hides last seen in afk.",
-                "requires_input": False
-            },
+            {"arg": "hls", "help": "Hides last seen in afk.", "requires_input": False},
             {
                 "arg": "dlm",
                 "help": "Doesn't logs mentioned messages.",
-                "requires_input": False
+                "requires_input": False,
             },
-        ]
+        ],
     },
 )
 async def afk(c: Client, m: Message):

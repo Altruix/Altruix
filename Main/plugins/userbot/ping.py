@@ -24,12 +24,12 @@ from pyrogram.errors import ChatSendInlineForbidden
         "help": "Ping userbot",
         "example": "ping",
         "user_args": [
-                        {
+            {
                 "arg": "c",
                 "help": "show the ping output as a regular text edit.",
-                "requires_input": False
+                "requires_input": False,
             },
-],
+        ],
     },
 )
 @inline_check

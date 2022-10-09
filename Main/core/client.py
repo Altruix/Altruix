@@ -9,11 +9,11 @@
 import os
 import sys
 import glob
+import html
 import time
 import yaml
 import shlex
 import random
-import html
 import shutil
 import asyncio
 import inspect
@@ -298,8 +298,8 @@ class AltruixClient:
         group=1,
         disallow_if_sender_is_channel=False,
     ):
-        if type(cmd) == str:
-            cmd =  [cmd]
+        if isinstance(cmd, str):
+            cmd = [cmd]
         self.cmd_list_s.extend(cmd)
         previous_stack_frame = inspect.stack()[1]
         file_name = os.path.basename(previous_stack_frame.filename.replace(".py", ""))
@@ -400,7 +400,9 @@ class AltruixClient:
         private_only: bool,
     ):
         example = html.escape(help_map.get("example", "No example available"))
-        help_text = html.escape(help_map.get("help", "Sorry, No help available for this command"))
+        help_text = html.escape(
+            help_map.get("help", "Sorry, No help available for this command")
+        )
         user_args = help_map.get("user_args")
         if isinstance(commands, str):
             commands = [commands]
@@ -418,7 +420,9 @@ class AltruixClient:
                     "private_only": private_only,
                 }
             ]
-        elif commands[0] not in [x.get("commands", [""])[0] for x in self.cmd_list[file_name]]:
+        elif commands[0] not in [
+            x.get("commands", [""])[0] for x in self.cmd_list[file_name]
+        ]:
             self.cmd_list[file_name].append(
                 {
                     "commands": commands,
@@ -451,7 +455,9 @@ class AltruixClient:
                 & ~filters.forwarded
             )
             for client in self.clients:
-                client.add_handler(MessageHandler(func_, filters=basic_filters), group=group)
+                client.add_handler(
+                    MessageHandler(func_, filters=basic_filters), group=group
+                )
         if self.bot_mode and not bot_mode_unsupported and not self.loaded_bot_cmds:
             bot_f = filter_s or filters.user(self.auth_users) & filters.command(
                 list(cmd), ["!", "/", "|"]
@@ -802,7 +808,7 @@ class AltruixClient:
     def prepare_help(self):
         self._command_help_message_data.clear()
         for plugin_name, commands_data in self.cmd_list.items():
-            plugin_name = plugin_name.lower() 
+            plugin_name = plugin_name.lower()
             self._command_help_message_data[plugin_name] = ""
             for each_command_data in commands_data:
                 commands_: List[str] = each_command_data.get("commands", ["???"])
@@ -811,20 +817,27 @@ class AltruixClient:
                 user_args = each_command_data.get("user_args")
                 self._command_help_message_data[plugin_name] += "\n<b>Command :</b>"
                 for _cmd_str in commands_:
-                    self._command_help_message_data[plugin_name] += f"<code>{self.user_command_handler}{_cmd_str}</code>/"
-                self._command_help_message_data[plugin_name] = self._command_help_message_data[plugin_name][:-1] + "\n"
-                self._command_help_message_data[plugin_name] += f"<b>Help :</b> <i>{help_text}</i>\n"
-                self._command_help_message_data[plugin_name] += f"<b>Example :</b> <code>{self.user_command_handler}{example_text}</code>\n"
+                    self._command_help_message_data[
+                        plugin_name
+                    ] += f"<code>{self.user_command_handler}{_cmd_str}</code>/"
+                self._command_help_message_data[plugin_name] = (
+                    self._command_help_message_data[plugin_name][:-1] + "\n"
+                )
+                self._command_help_message_data[
+                    plugin_name
+                ] += f"<b>Help :</b> <i>{help_text}</i>\n"
+                self._command_help_message_data[
+                    plugin_name
+                ] += f"<b>Example :</b> <code>{self.user_command_handler}{example_text}</code>\n"
                 if user_args:
-                    self._command_help_message_data[plugin_name] += "<b>Arguments:</b>\n"
+                    self._command_help_message_data[
+                        plugin_name
+                    ] += "<b>Arguments:</b>\n"
                     for arg_data in user_args:
                         arg_name = arg_data.get("arg")
                         arg_help = html.escape(arg_data.get("help"))
                         arg_requires_input = arg_data.get("requires_input")
-                        self._command_help_message_data[plugin_name] += f"   <code>-{arg_name}</code> - {arg_help}{' [need input]' if arg_requires_input else ''}\n"
+                        self._command_help_message_data[
+                            plugin_name
+                        ] += f"   <code>-{arg_name}</code> - {arg_help}{' [need input]' if arg_requires_input else ''}\n"
                 # self._command_help_message_data[plugin_name] += f" \n"
-            
-        
-        
-        
-

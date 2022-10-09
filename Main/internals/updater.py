@@ -16,11 +16,13 @@ from Main.core.types.message import Message
     cmd_help={
         "help": "Updates your userbot bot.",
         "example": "update",
-        "user_args": [{
+        "user_args": [
+            {
                 "arg": "changelog",
                 "help": "Generate and shows changelog.",
-                "requires_input": False
-            }],
+                "requires_input": False,
+            }
+        ],
     },
 )
 async def update(client, message: Message):

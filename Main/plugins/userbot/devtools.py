@@ -27,18 +27,19 @@ from Main.utils.dev_func import eval_py, exec_terminal
             {
                 "arg": "p",
                 "help": "Pastes the output to paste bin.",
-                "requires_input": False
+                "requires_input": False,
             },
-                                {
+            {
                 "arg": "f",
                 "help": "Force sends the output as a file.",
-                "requires_input": False
+                "requires_input": False,
             },
             {
                 "arg": "s",
                 "help": "Sends the output to log chat and deletes the command.",
-                "requires_input": False
-            }],
+                "requires_input": False,
+            },
+        ],
     },
 )
 async def get_json_message_handler(c: Client, m: Message):
@@ -65,18 +66,19 @@ async def get_json_message_handler(c: Client, m: Message):
             {
                 "arg": "p",
                 "help": "Pastes the output to paste bin.",
-                "requires_input": False
+                "requires_input": False,
             },
-                                {
+            {
                 "arg": "f",
                 "help": "Force sends the output as a file.",
-                "requires_input": False
+                "requires_input": False,
             },
             {
                 "arg": "s",
                 "help": "Sends the output to log chat and deletes the command.",
-                "requires_input": False
-            }],
+                "requires_input": False,
+            },
+        ],
     },
     just_exc=True,
 )
@@ -131,18 +133,19 @@ async def evaluate_command_handler(c: Client, m: Message):
             {
                 "arg": "p",
                 "help": "Pastes the output to paste bin.",
-                "requires_input": False
+                "requires_input": False,
             },
-                                {
+            {
                 "arg": "f",
                 "help": "Force sends the output as a file.",
-                "requires_input": False
+                "requires_input": False,
             },
             {
                 "arg": "s",
                 "help": "Sends the output to log chat and deletes the command.",
-                "requires_input": False
-            }],
+                "requires_input": False,
+            },
+        ],
     },
 )
 async def terminal(c: Client, m: Message):
@@ -200,23 +203,20 @@ async def paste_logs(log_path):
     cmd_help={
         "help": "Retrieve logs of the bot.",
         "example": "logs",
-        "user_args": 
-            [
+        "user_args": [
             {
                 "arg": "p",
                 "help": "Pastes the logs to paste bin.",
-                "requires_input": False
-            },
-                                {
-                "arg": "s",
-                "help": "Silently sends logs to log chat.",
-                "requires_input": False
+                "requires_input": False,
             },
             {
-                "arg": "r",
-                "help": "Resets logs.",
-                "requires_input": False
-            }],}
+                "arg": "s",
+                "help": "Silently sends logs to log chat.",
+                "requires_input": False,
+            },
+            {"arg": "r", "help": "Resets logs.", "requires_input": False},
+        ],
+    },
 )
 async def logs(c: Client, m: Message):
     log_file_ = "altruix.log"

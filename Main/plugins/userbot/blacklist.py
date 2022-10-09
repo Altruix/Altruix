@@ -25,8 +25,9 @@ warn_count = {}
             {
                 "arg": "limit",
                 "help": "Set a warn limit for that blacklisted word.",
-                "requires_input": True
-            }],
+                "requires_input": True,
+            }
+        ],
     },
     requires_input=True,
 )
@@ -83,8 +84,9 @@ async def list_blacklist_cmd_handler(c: Client, m: Message):
             {
                 "arg": "all",
                 "help": "Removes all blacklisted word in the chat.",
-                "requires_input": False
-            }]
+                "requires_input": False,
+            }
+        ],
     },
 )
 async def delete_blacklist_cmd_handler(c: Client, m: Message):

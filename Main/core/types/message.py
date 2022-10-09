@@ -6,12 +6,12 @@
 #
 # All rights reserved.
 
-from dataclasses import dataclass
 import re
 import asyncio
 import contextlib
 from Main import Altruix
-from typing import List, Tuple, Union
+from typing import Tuple, Union
+from dataclasses import dataclass
 from Main.utils.paste import Paste
 from datetime import datetime, timedelta
 from pyrogram.utils import zero_datetime
@@ -24,18 +24,24 @@ from Main.utils.file_helpers import make_file_from_text
 
 class REGEX_STRINGS(object):
     ARGS_REGEX = r"(-[a-zA-Z]+)([0-9]*)$"
+
+
 @dataclass
 class Arg:
     key: str
     value: str
 
+
 class Args(list):
     def __init__(self, *args):
         super(Args, self).__init__(args)
+
     def __contains__(self, key):
-        return key in [x.key for x in self]    
+        return key in [x.key for x in self]
+
     def __getattr__(self, key):
         return {x.key: x.value for x in self}.get(key)
+
 
 @monkeypatch(RawMessage)
 class Message:
@@ -94,7 +100,7 @@ class Message:
         if raw_user_input is None:
             return []
         user_args: Args[Arg] = Args()
-        matches = re.findall(r'-(\w+ ?.*?(?=-)|\w+)?|\w+', raw_user_input)
+        matches = re.findall(r"-(\w+ ?.*?(?=-)|\w+)?|\w+", raw_user_input)
         for match in matches:
             if not match:
                 continue

@@ -19,11 +19,13 @@ packages_list = Altruix.db.make_collection("packages")
     cmd_help={
         "example": "apm_install vcplayer",
         "help": "install packages made for altruix.",
-        "user_args": [{
+        "user_args": [
+            {
                 "arg": "ios",
                 "help": "Install package on startup.",
-                "requires_input": False
-            },],
+                "requires_input": False,
+            },
+        ],
     },
     requires_input=True,
 )
