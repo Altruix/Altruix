@@ -14,7 +14,7 @@ from ...core.types.message import Message
 
 
 pm_permit_warning_cache = {}
-whatever_this_shit_is = {}
+__last_message_cache = {}
 pm_permit_col = Altruix.db.make_collection("pm_permit")
 
 
@@ -239,7 +239,7 @@ async def pm_permit_command_handler(c: Client, m: Message):
     filters.private & ~filters.group & ~filters.channel, 3, bot_mode_unsupported=True
 )
 async def pm_permit_new_message_listener_handler(c: Client, m: Message):
-    if await Altruix.config.get_pm_sts():
+    if not await Altruix.config.get_pm_sts():
         return
 
     if (
@@ -253,20 +253,20 @@ async def pm_permit_new_message_listener_handler(c: Client, m: Message):
 
     if m.from_user.is_self or m.from_user.is_contact or m.from_user.is_bot:
         return
-    pm_warns_count = int(pm_permit_warning_cache.get(c.myself.id) or 3)
+    pm_warns_count = int(pm_permit_warning_cache.get(c.myself.id, 3))
     if (
         pm_permit_warning_cache.get(int(m.from_user.id))
         and int(pm_permit_warning_cache[m.from_user.id]) >= pm_warns_count
     ):
-        await m.reply_msg("PM_PERMIT_ALREADY_WARNED")
+        out = await m.reply_msg("PM_PERMIT_ALREADY_WARNED")
         del pm_permit_warning_cache[m.from_user.id]
-        out = await m.reply("Blocked?", quote=True)
         return await m.from_user.block()
-
+    else:
+        out = await m.reply_msg("<i>Hello there, This is an automated message. I'll respond soon.</i>")
     if m.from_user.id not in pm_permit_warning_cache:
         pm_permit_warning_cache[m.from_user.id] = 1
     else:
         pm_permit_warning_cache[m.from_user.id] += 1
-    if m.from_user.id in whatever_this_shit_is:
-        await whatever_this_shit_is[m.from_user.id]._delete()
-    whatever_this_shit_is[m.from_user.id] = out
+    if m.from_user.id in __last_message_cache:
+        await __last_message_cache[m.from_user.id]._delete()
+    __last_message_cache[m.from_user.id] = out
