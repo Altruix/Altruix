@@ -19,14 +19,15 @@ import httpx
 import shutil
 import tarfile
 import aiofiles
+import importlib
 import contextlib
-from typing import Any, Callable, List, Optional, Union
 from traceback import format_exc
 from types import SimpleNamespace
 from pyrogram.types import Message
+from typing import Any, List, Union, Callable, Optional
 from Main.core.exceptions import (
     Package404, AlreadyInstalled, InvalidPackageToUpdate)
-import importlib
+
 
 apt_available = True
 
@@ -35,33 +36,39 @@ try:
 except (ImportError):
     apt_available = False
 
+
 class _BaseModel:
     def __init__(self) -> None:
         pass
-    
+
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         pass
 
+
 class Plugin(_BaseModel):
-    def __init__(self, name: str, description: Optional[str] = None, deps: Optional[List[str]] = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        deps: Optional[List[str]] = None,
+    ) -> None:
         super().__init__()
         self.__handlers: List[Callable] = []
         self.name = name
         self.description = description
         self.deps = deps
         self.install_and_import()
-    
+
         def install_and_import(self):
             for package in self.deps:
                 try:
                     importlib.import_module(package)
                 except ImportError:
                     import pip
-                    pip.main(['install', package])
+
+                    pip.main(["install", package])
                 finally:
                     globals()[package] = importlib.import_module(package)
-    
-
 
 
 class APM:
