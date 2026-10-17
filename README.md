@@ -85,7 +85,7 @@ Configure your credentials in `.env` or through environment variables:
 | `SESSIONS` | **Yes** | `[]` | One or more Telethon StringSessions for userbot functionality. |
 | `BOT_TOKEN` | Optional | `None` | Telegram Bot Token from [@BotFather](https://t.me/BotFather) for the assistant bot. |
 | `OWNER_ID` | Optional | `None` | Telegram User ID of the primary owner (obtain via [@MissRose_Bot](https://t.me/MissRose_Bot) `/id`). |
-| `DB_URI` | Optional | Local JSON | MongoDB connection URI (`mongodb+srv://...`). When omitted, uses `local_db.json`. |
+| `DB_URI` | Optional | Local JSON | Database connection URI. Supports MongoDB (`mongodb+srv://`), PostgreSQL (`postgresql://`), SQLite (`sqlite:///altruix.db`), Redis (`redis://`), or omit to use `local_db.json`. |
 | `DB_NAME` | Optional | `Altruix` | Database collection namespace name. |
 | `CMD_HANDLER` | Optional | `.` | Command prefix for userbot commands (e.g. `.help`, `.ping`). |
 | `SUDO_CMD_HANDLER` | Optional | `!` | Command prefix for authorized sudo operators. |
@@ -103,9 +103,30 @@ SESSIONS="1BJWap1wBu..."
 OWNER_ID=987654321
 CMD_HANDLER="."
 SUDO_CMD_HANDLER="!"
-DB_URI="mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority"
+
+# Choose your database backend (see Multi-Database section below):
+DB_URI="sqlite:///altruix.db"
 DB_NAME="Altruix"
 ```
+
+---
+
+## 🗄️ Multi-Database Support (Mongo, SQL, & Local)
+
+Altruix features a **Universal Database Layer** powered by `PyMongoInstructionParser`. You can write standard async MongoDB syntax (`find()`, `find_one()`, `insert_one()`, `update_one()`, `delete_many()`, `$set`, `$inc`, `$push`) and Altruix automatically routes and translates queries to your chosen backend:
+
+| Backend | `DB_URI` Format | Best For | Prerequisites |
+|---|---|---|---|
+| **Local JSON** *(Default)* | *(Leave empty)* or `local_db.json` | Zero-configuration local development | None (works out of the box) |
+| **SQLite (SQL)** | `sqlite:///altruix.db` or `altruix.db` | Single-server / VPS deployments | Built-in (no extra database setup needed) |
+| **PostgreSQL (SQL)** | `postgresql://user:pass@host:5432/dbname` | High-concurrency production deployments | Running PostgreSQL instance |
+| **MongoDB (NoSQL)** | `mongodb+srv://user:pass@cluster.mongodb.net/` | Scalable cloud database (MongoDB Atlas) | Running MongoDB cluster |
+| **Redis** | `redis://[:pass@]host:6379/0` | High-speed memory-backed cache/store | Running Redis instance |
+
+### How It Works Under The Hood:
+1. **Auto-Detection:** When Altruix boots, `create_database(DB_URI)` detects the connection scheme.
+2. **Transparent Query Translation:** For SQL databases (PostgreSQL & SQLite), `PyMongoInstructionParser` compiles MongoDB query dicts and update operators directly into optimized parameterized SQL statements (`SELECT data FROM table WHERE ...`), storing documents as indexed JSON objects.
+3. **Async Cursor Parity:** Cursors across all backends implement standard async iteration (`async for item in col.find({...}):`), ensuring 100% plugin compatibility without writing backend-specific SQL.
 
 ---
 

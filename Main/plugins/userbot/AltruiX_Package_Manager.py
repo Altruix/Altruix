@@ -7,8 +7,6 @@
 # All rights reserved.
 
 import os
-import shutil
-import logging
 from traceback import format_exc
 from Main import Altruix
 from Main.core.apm import *

@@ -51,6 +51,8 @@ class BaseConfig:
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     BOT_MODE = os.getenv("BOT_MODE", "false").lower() in {"true", "yes", "enable", "1"}
     AUTOPOST_CACHE: dict = {}
+    FILTERS_CACHE: dict = {}
+    BLACKLIST_CACHE: dict = {}
     CUSTOM_BOT_MEDIA = os.getenv("CUSTOM_BOT_MEDIA")
     OWNER_ID = (
         int(os.getenv("OWNER_ID"))

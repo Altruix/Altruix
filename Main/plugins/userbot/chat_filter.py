@@ -59,6 +59,8 @@ async def add_filter(c: Client, m: Message):
                 {"keyword": kw, "chat_id": chat_id, "client_id": my_id_, "reply": reply_val}
             )
             added_count += 1
+        if hasattr(Altruix.config, "FILTERS_CACHE"):
+            Altruix.config.FILTERS_CACHE.setdefault(my_id_, {}).setdefault(chat_id, {})[kw] = reply_val
 
     kw_list = ", ".join(f"<code>{k}</code>" for k in keywords)
     if len(keywords) == 1:
@@ -100,6 +102,8 @@ async def remove_filter(c: Client, m: Message):
         )
         if res:
             removed.append(kw)
+            if hasattr(Altruix.config, "FILTERS_CACHE"):
+                Altruix.config.FILTERS_CACHE.get(my_id_, {}).get(chat_id, {}).pop(kw, None)
         else:
             not_found.append(kw)
 
@@ -153,38 +157,55 @@ async def delfilters(c: Client, m: Message):
     my_id_ = c.myself.id
     deleted = await filters_db.delete_many({"chat_id": chat_id, "client_id": my_id_})
     if deleted.deleted_count > 0:
+        if hasattr(Altruix.config, "FILTERS_CACHE"):
+            Altruix.config.FILTERS_CACHE.get(my_id_, {}).pop(chat_id, None)
         await ms.edit_msg("FILTER_DELETED_ALL", string_args=(chat_id,))
     else:
         await ms.edit_msg("FILTER_DONT_EXIST", string_args=(getattr(m.chat, "title", str(chat_id)),))
 
 
 async def filter_check(c: Client, m: Message) -> bool:
-    if Altruix.db is None or not m.text:
+    if not m.text:
         return False
     if m.out and not getattr(Altruix, "self_test_mode", False):
         return False
     if m.text.startswith(getattr(Altruix, "user_command_handler", ".")):
         return False
-    filters_db = Altruix.db.make_collection("FILTERS")
     my_id = getattr(c.myself, "id", None)
     if not my_id:
         return False
     chat_id = m.chat_id or (getattr(m.chat, "id", None))
+
+    cached = getattr(Altruix.config, "FILTERS_CACHE", {}).get(my_id, {}).get(chat_id)
+    if cached is not None:
+        return m.text.lower() in cached
+
+    if Altruix.db is None:
+        return False
+    filters_db = Altruix.db.make_collection("FILTERS")
     doc = await filters_db.find_one({"keyword": m.text.lower(), "chat_id": chat_id, "client_id": my_id})
     return bool(doc)
 
 
 @Altruix.on_message(create(filter_check))
 async def filter_trigger_handler(c: Client, m: Message):
-    if Altruix.db is None:
-        return
-    filters_db = Altruix.db.make_collection("FILTERS")
     my_id = c.myself.id
-    doc = await filters_db.find_one({"keyword": m.text.lower(), "chat_id": m.chat.id, "client_id": my_id})
-    if doc and doc.get("reply"):
-        reply_val = doc["reply"]
+    chat_id = m.chat_id or (getattr(m.chat, "id", None))
+    text_l = m.text.lower()
+    reply_val = None
+
+    cached = getattr(Altruix.config, "FILTERS_CACHE", {}).get(my_id, {}).get(chat_id)
+    if cached is not None and text_l in cached:
+        reply_val = cached[text_l]
+    elif Altruix.db is not None:
+        filters_db = Altruix.db.make_collection("FILTERS")
+        doc = await filters_db.find_one({"keyword": text_l, "chat_id": chat_id, "client_id": my_id})
+        if doc:
+            reply_val = doc.get("reply")
+
+    if reply_val:
         if str(reply_val).isdigit() and Altruix.log_chat:
-            chat_target = await m.get_input_chat() if hasattr(m, "get_input_chat") else (m.chat_id or m.chat.id)
+            chat_target = await m.get_input_chat() if hasattr(m, "get_input_chat") else chat_id
             await c.send_message(chat_target, await c.get_messages(Altruix.log_chat, ids=int(reply_val)), reply_to=m.id)
         else:
             await m.reply(str(reply_val))

@@ -20,5 +20,10 @@ fi
 
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -e .
+if [ ! -f .env ]; then
+    echo "[INFO] No .env found. Launching Setup Wizard..."
+    .venv/bin/python -m Main.scripts.wizard || true
+fi
+
 .venv/bin/python -m Main.core.apm_env_setup
 exec .venv/bin/python -m Main

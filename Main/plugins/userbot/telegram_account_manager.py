@@ -6,10 +6,8 @@
 #
 # All rights reserved.
 
-import os
-import time
 from Main import Altruix
-from telethon import functions, types, errors
+from telethon import functions, types
 from Main.core.types import AltruixTelegramClient as Client, Message
 from Main.utils.suppress import suppress_error
 

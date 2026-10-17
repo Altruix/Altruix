@@ -33,6 +33,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import httpx
 import telethon
 from telethon import events, errors, functions, types
 from telethon.sessions import StringSession, MemorySession
@@ -68,7 +69,13 @@ class BotWrapper:
             return getattr(self._altruix._raw_bot, name)
         raise AttributeError(f"'BotWrapper' has no attribute '{name}' (bot not initialized yet)")
 
-    def on_message(self, custom_filter: Optional[Filter] = None):
+    def on_message(self, custom_filter: Optional[Any] = None, pattern: Optional[Any] = None, *args, **kwargs):
+        if pattern is not None:
+            regex_filter = default_filters.regex(pattern)
+            custom_filter = (custom_filter & regex_filter) if custom_filter is not None else regex_filter
+        elif isinstance(custom_filter, (str, re.Pattern)):
+            custom_filter = default_filters.regex(custom_filter)
+
         def decorator(func: Callable):
             self._altruix._pending_bot_handlers.append(("message", custom_filter, func))
             if self._altruix._raw_bot is not None:
@@ -76,7 +83,13 @@ class BotWrapper:
             return func
         return decorator
 
-    def on_callback_query(self, custom_filter: Optional[Filter] = None):
+    def on_callback_query(self, custom_filter: Optional[Any] = None, pattern: Optional[Any] = None, *args, **kwargs):
+        if pattern is not None:
+            regex_filter = default_filters.regex(pattern)
+            custom_filter = (custom_filter & regex_filter) if custom_filter is not None else regex_filter
+        elif isinstance(custom_filter, (str, re.Pattern)):
+            custom_filter = default_filters.regex(custom_filter)
+
         def decorator(func: Callable):
             self._altruix._pending_bot_handlers.append(("callback_query", custom_filter, func))
             if self._altruix._raw_bot is not None:
@@ -84,7 +97,13 @@ class BotWrapper:
             return func
         return decorator
 
-    def on_inline_query(self, custom_filter: Optional[Filter] = None):
+    def on_inline_query(self, custom_filter: Optional[Any] = None, pattern: Optional[Any] = None, *args, **kwargs):
+        if pattern is not None:
+            regex_filter = default_filters.regex(pattern)
+            custom_filter = (custom_filter & regex_filter) if custom_filter is not None else regex_filter
+        elif isinstance(custom_filter, (str, re.Pattern)):
+            custom_filter = default_filters.regex(custom_filter)
+
         def decorator(func: Callable):
             self._altruix._pending_bot_handlers.append(("inline_query", custom_filter, func))
             if self._altruix._raw_bot is not None:
@@ -140,6 +159,7 @@ class AltruixClient:
         self.plugin_manager: Optional[PluginManager] = None  # initialized after setup
         self._stop_event: Optional[asyncio.Event] = None
         self._restart_requested = False
+        self._http: Optional[httpx.AsyncClient] = None
         self.suppress = suppress_error
         self.suppress_error = suppress_error
         self.safe_suppress = suppress_error
@@ -623,7 +643,17 @@ class AltruixClient:
                 setattr(event, "from_user", types.User(id=event.sender_id) if event.sender_id else None)
                 if custom_filter is not None and not await custom_filter(self._raw_bot, event):
                     return
-                await func(self._raw_bot, event)
+                try:
+                    sig = inspect.signature(func)
+                    if len(sig.parameters) == 1:
+                        await func(event)
+                    else:
+                        await func(self._raw_bot, event)
+                except (TypeError, ValueError):
+                    try:
+                        await func(self._raw_bot, event)
+                    except TypeError:
+                        await func(event)
             self._raw_bot.add_event_handler(cq_cb, events.CallbackQuery())
 
         elif handler_type == "inline_query":
@@ -631,7 +661,17 @@ class AltruixClient:
                 setattr(event, "from_user", types.User(id=event.sender_id) if event.sender_id else None)
                 if custom_filter is not None and not await custom_filter(self._raw_bot, event):
                     return
-                await func(self._raw_bot, event)
+                try:
+                    sig = inspect.signature(func)
+                    if len(sig.parameters) == 1:
+                        await func(event)
+                    else:
+                        await func(self._raw_bot, event)
+                except (TypeError, ValueError):
+                    try:
+                        await func(self._raw_bot, event)
+                    except TypeError:
+                        await func(event)
             self._raw_bot.add_event_handler(iq_cb, events.InlineQuery())
 
         elif handler_type == "telethon_event":
@@ -671,10 +711,16 @@ class AltruixClient:
         elif commands[0] not in [x.get("commands", [""])[0] for x in self.cmd_list[file_name]]:
             self.cmd_list[file_name].append(data)
 
+    @property
+    def http(self) -> httpx.AsyncClient:
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(timeout=20.0, http2=True)
+        return self._http
+
     async def update_cache(self) -> None:
         if self.db is not None:
             cache = Cache(self.config, self.db, self.clients)
-            await cache.update_auto_post_cache()
+            await cache.update_all()
 
     async def _setup(self, restart: bool = False, *args, **kwargs) -> None:
         if not os.path.isdir("cache"):
@@ -1087,6 +1133,9 @@ class AltruixClient:
         if self.plugin_manager is not None:
             with contextlib.suppress(Exception):
                 await self.plugin_manager._http.aclose()
+        if self._http is not None and not self._http.is_closed:
+            with contextlib.suppress(Exception):
+                await self._http.aclose()
         if hasattr(self, "db") and self.db is not None and hasattr(self.db, "close"):
             self.db.close()
         self.executor.shutdown(wait=False)
