@@ -499,9 +499,6 @@ class Config(BaseConfig):
         setattr(self, key, val)
         await self.add_env_to_db(key, val, upsert=True)
 
-    async def sync_env_to_db(self, key: str, val: Any) -> None:
-        await self.set_env(key, val)
-
     async def get_progress_bar_sts(self) -> bool:
         val = await self.get_env("USE_PROGRESS_BAR")
         if val is None:
