@@ -22,7 +22,7 @@
 * **APM v3 Package Manager**: Hot-install, update, and segregate third-party plugin suites directly from GitHub repositories without touching core code.
 * **Zero-Latency Boot**: Pre-flight `importlib` dependency satisfaction eliminates slow `pip` invocations during startup.
 * **Multi-Domain Ecosystem**: First-class support for media synthesis, deep OSINT, everyday utilities, and group automation.
-* **Hybrid Database**: Zero-config local JSON persistence (`local_db.json`) out of the box, with seamless high-throughput MongoDB clustering support.
+* **Universal Database**: Zero-config local SQLite persistence (`altruix.db`) out of the box, with seamless high-throughput MongoDB, PostgreSQL, and Redis support.
 * **Multi-Session Multi-Client**: Run and manage multiple user sessions concurrently from a single instance.
 
 ---
@@ -85,7 +85,7 @@ Configure your credentials in `.env` or through environment variables:
 | `SESSIONS` | **Yes** | `[]` | One or more Telethon StringSessions for userbot functionality. |
 | `BOT_TOKEN` | Optional | `None` | Telegram Bot Token from [@BotFather](https://t.me/BotFather) for the assistant bot. |
 | `OWNER_ID` | Optional | `None` | Telegram User ID of the primary owner (obtain via [@MissRose_Bot](https://t.me/MissRose_Bot) `/id`). |
-| `DB_URI` | Optional | Local JSON | Database connection URI. Supports MongoDB (`mongodb+srv://`), PostgreSQL (`postgresql://`), SQLite (`sqlite:///altruix.db`), Redis (`redis://`), or omit to use `local_db.json`. |
+| `DB_URI` | Optional | `sqlite:///altruix.db` | Database connection URI. Supports SQLite (`sqlite:///altruix.db`), MongoDB (`mongodb+srv://`), PostgreSQL (`postgresql://`), or Redis (`redis://`). |
 | `DB_NAME` | Optional | `Altruix` | Database collection namespace name. |
 | `CMD_HANDLER` | Optional | `.` | Command prefix for userbot commands (e.g. `.help`, `.ping`). |
 | `SUDO_CMD_HANDLER` | Optional | `!` | Command prefix for authorized sudo operators. |
@@ -111,16 +111,15 @@ DB_NAME="Altruix"
 
 ---
 
-## 🗄️ Multi-Database Support (Mongo, SQL, & Local)
+## 🗄️ Multi-Database Support (SQLite, Mongo, Postgres, & Redis)
 
 Altruix features a **Universal Database Layer** powered by `PyMongoInstructionParser`. You can write standard async MongoDB syntax (`find()`, `find_one()`, `insert_one()`, `update_one()`, `delete_many()`, `$set`, `$inc`, `$push`) and Altruix automatically routes and translates queries to your chosen backend:
 
 | Backend | `DB_URI` Format | Best For | Prerequisites |
 |---|---|---|---|
-| **Local JSON** *(Default)* | *(Leave empty)* or `local_db.json` | Zero-configuration local development | None (works out of the box) |
-| **SQLite (SQL)** | `sqlite:///altruix.db` or `altruix.db` | Single-server / VPS deployments | Built-in (no extra database setup needed) |
-| **PostgreSQL (SQL)** | `postgresql://user:pass@host:5432/dbname` | High-concurrency production deployments | Running PostgreSQL instance |
+| **SQLite (SQL)** *(Default)* | `sqlite:///altruix.db` *(or leave empty)* | Single-server / VPS deployments & local testing | Built-in (zero-config, works out of the box) |
 | **MongoDB (NoSQL)** | `mongodb+srv://user:pass@cluster.mongodb.net/` | Scalable cloud database (MongoDB Atlas) | Running MongoDB cluster |
+| **PostgreSQL (SQL)** | `postgresql://user:pass@host:5432/dbname` | High-concurrency production deployments (Supabase, Neon) | Running PostgreSQL instance |
 | **Redis** | `redis://[:pass@]host:6379/0` | High-speed memory-backed cache/store | Running Redis instance |
 
 ### How It Works Under The Hood:

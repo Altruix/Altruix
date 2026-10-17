@@ -45,7 +45,7 @@ from Main.utils.paste import Paste
 from ..utils._updater import Updater
 from .config import Config, BaseConfig
 from ..utils.suppress import suppress_error, safe_suppress, suppress
-from .database import MongoDB, LocalDatabase, create_database
+from .database import MongoDB, LocalDatabase, SQLDatabase, create_database
 from .plugin_manager import PluginManager
 from .types.client import AltruixTelegramClient
 from .types.message import Message, enrich_message
@@ -141,7 +141,7 @@ class AltruixClient:
         self.training_wheels_protocol = False
         self._init_logger()
 
-        self.local_db = LocalDatabase()
+        self.local_db = SQLDatabase("sqlite:///altruix.db", db_name="Altruix", dialect="sqlite")
         self.executor = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count() * 5)
         self._mongo_db: Optional[MongoDB] = None
         self.config: Config = Config(self.local_db.env_col, executor=self.executor)
@@ -166,13 +166,13 @@ class AltruixClient:
         self.setup_localization_sync()
 
     @property
-    def db(self) -> Union[MongoDB, LocalDatabase]:
+    def db(self) -> Union[MongoDB, SQLDatabase, LocalDatabase]:
         if self._mongo_db is not None:
             return self._mongo_db
         return self.local_db
 
     @db.setter
-    def db(self, val: Optional[MongoDB]) -> None:
+    def db(self, val: Optional[Any]) -> None:
         self._mongo_db = val
 
     def _init_logger(self) -> None:
@@ -241,19 +241,17 @@ class AltruixClient:
         with contextlib.suppress(Exception):
             await self.update_on_startup()
         await self.resolve_dns()
-        if self.config.DB_URI:
-            try:
-                self.db = create_database(self.config.DB_URI, db_name=self.config.DB_NAME or "Altruix")
-                backend_name = type(self.db).__name__
-                self.log(f"Initialized Database ({backend_name}) successfully!")
-                if not await self.db.ping():
-                    raise ConnectionError(f"{backend_name} did not respond to the ping command")
-                self.log(f"Pinged {backend_name} successfully!")
-            except Exception as e:
-                self.log(f"Database connection failed: {e}. Falling back to local storage.", level=logging.WARNING)
-                self.db = None
-        else:
-            self.log("No DB_URI provided. Running with local configuration.", level=logging.INFO)
+        target_uri = self.config.DB_URI or "sqlite:///altruix.db"
+        try:
+            self.db = create_database(target_uri, db_name=self.config.DB_NAME or "Altruix")
+            backend_name = type(self.db).__name__
+            self.log(f"Initialized Database ({backend_name}) successfully!")
+            if not await self.db.ping():
+                raise ConnectionError(f"{backend_name} did not respond to the ping command")
+            self.log(f"Pinged {backend_name} successfully!")
+        except Exception as e:
+            self.log(f"Database connection failed: {e}. Falling back to default SQLite database.", level=logging.WARNING)
+            self.db = SQLDatabase("sqlite:///altruix.db", db_name="Altruix", dialect="sqlite")
         self.app_url_ = await prepare_heroku_url()
 
     def run_in_exc(self, func_: Callable) -> Callable:

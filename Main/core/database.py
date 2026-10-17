@@ -624,6 +624,39 @@ class SQLDatabase:
             self._collections[name] = SQLCollection(self, name)
         return self._collections[name]
 
+    def close(self) -> None:
+        if self._conn:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+
+    def get_from_col(self, col: str, key: str) -> Optional[Any]:
+        if self._conn:
+            try:
+                table_name = f"col_{col.lower()}"
+                cur = self._conn.cursor()
+                row = cur.execute(f"SELECT val FROM {table_name} WHERE key=?", (str(key),)).fetchone()
+                if row:
+                    data = json.loads(row[0])
+                    return data.get("val") or data.get("text") or data.get("content") or data
+            except Exception:
+                pass
+        return None
+
+    def add_to_col(self, col: str, key: str, val: Any) -> None:
+        if self._conn:
+            try:
+                table_name = f"col_{col.lower()}"
+                cur = self._conn.cursor()
+                cur.execute(f"CREATE TABLE IF NOT EXISTS {table_name} (key TEXT PRIMARY KEY, val TEXT)")
+                doc = {"_id": str(key), "val": val}
+                cur.execute(f"INSERT OR REPLACE INTO {table_name} (key, val) VALUES (?, ?)", (str(key), json.dumps(doc)))
+                self._conn.commit()
+            except Exception:
+                pass
+
     async def _execute(self, sql: str, params: tuple = ()) -> None:
         loop = asyncio.get_running_loop()
         def _run():
@@ -840,10 +873,10 @@ def create_database(uri: Optional[str] = None, db_name: str = "Altruix") -> Unio
       - postgresql:// or postgres:// -> PostgreSQL Adapter
       - sqlite://, sqlite3://, or *.db -> SQLite Adapter
       - redis:// or rediss:// -> Redis Adapter
-      - Empty or local -> LocalDatabase
+      - Empty or local -> Default to SQLite (altruix.db)
     """
-    if not uri or str(uri).strip().lower() in ("local", "none", "", "local_db.json"):
-        return LocalDatabase()
+    if not uri or str(uri).strip().lower() in ("local", "none", "", "local_db.json", "sqlite"):
+        return SQLDatabase(f"sqlite:///{db_name.lower()}.db", db_name=db_name, dialect="sqlite")
 
     raw_uri = str(uri).strip()
     lower_uri = raw_uri.lower()
@@ -864,4 +897,4 @@ def create_database(uri: Optional[str] = None, db_name: str = "Altruix") -> Unio
             logger.warning("redis package not installed for Redis URI; falling back to SQLite.")
             return SQLDatabase(f"{db_name.lower()}.db", db_name=db_name, dialect="sqlite")
 
-    return LocalDatabase()
+    return SQLDatabase(f"sqlite:///{db_name.lower()}.db", db_name=db_name, dialect="sqlite")

@@ -9,6 +9,7 @@
 import re
 import unittest
 import asyncio
+import time
 from typing import Any, Dict
 
 from Main.core.mongo_parser import PyMongoInstructionParser, _safe_eq, _get_nested, _set_nested, _unset_nested
@@ -308,9 +309,11 @@ class TestDatabaseAsyncOperations(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(db_pg, SQLDatabase)
         self.assertEqual(db_pg.dialect, "postgres")
 
-        # Local fallback
-        db_local = create_database(None)
-        self.assertIsInstance(db_local, LocalDatabase)
+        # Default fallback to SQLite
+        db_default = create_database(None)
+        self.assertIsInstance(db_default, SQLDatabase)
+        self.assertEqual(db_default.dialect, "sqlite")
+        db_default.close()
 
 
     async def test_all_plugin_database_patterns(self):
@@ -386,6 +389,26 @@ class TestDatabaseAsyncOperations(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(afk_rec["reason"], "sleeping")
         await settings_col.delete_one({"_id": "AFK", "client_id": 555})
         self.assertIsNone(await settings_col.find_one({"_id": "AFK", "client_id": 555}))
+
+        # 7. whisper.py pattern (DB persistence + 1-day TTL)
+        whisper_col = self.sql_db.make_collection("WHISPERS")
+        now = time.time()
+        whisper_doc = {
+            "_id": "test_whisper_123",
+            "user": "@testuser",
+            "msg": "Super secret text",
+            "sender_id": 999999,
+            "created_at": now,
+            "expires_at": now + 86400,
+        }
+        await whisper_col.insert_one(whisper_doc)
+        fetched = await whisper_col.find_one({"_id": "test_whisper_123"})
+        self.assertIsNotNone(fetched)
+        self.assertEqual(fetched["msg"], "Super secret text")
+        self.assertGreater(fetched["expires_at"], now)
+        # Test TTL query/cleanup
+        await whisper_col.delete_many({"expires_at": {"$lt": now + 90000}})
+        self.assertIsNone(await whisper_col.find_one({"_id": "test_whisper_123"}))
 
 
 if __name__ == "__main__":

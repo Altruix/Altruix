@@ -105,18 +105,15 @@ def main():
 
     # 4. Database Selection
     print("\n--- 4. Database Storage Engine ---")
-    print("1) SQLite (Default & Recommended - Fast, zero-setup file database)")
-    print("2) MongoDB Atlas / Local (mongodb+srv://...)")
-    print("3) PostgreSQL (postgresql://...)")
-    print("4) Local JSON (Fallback zero-config file)")
-    db_choice = prompt("Choose database backend (1-4)", default="1").strip()
+    print("1) SQLite (Default & Recommended - Fast, zero-setup embedded database)")
+    print("2) MongoDB Atlas / Cloud (mongodb+srv://...)")
+    print("3) PostgreSQL / Supabase / Neon (postgresql://...)")
+    db_choice = prompt("Choose database backend (1-3)", default="1").strip()
 
     if db_choice == "2":
         db_uri = prompt("Enter MongoDB URI", default="mongodb://localhost:27017")
     elif db_choice == "3":
         db_uri = prompt("Enter PostgreSQL URI", default="postgresql://user:pass@localhost:5432/altruix")
-    elif db_choice == "4":
-        db_uri = ""
     else:
         db_uri = "sqlite:///altruix.db"
 

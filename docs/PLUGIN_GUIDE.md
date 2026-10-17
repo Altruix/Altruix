@@ -213,7 +213,7 @@ Multiple permissions:
 
 ## 8. Database Storage (MongoDB & Local DB)
 
-Altruix abstracts database operations so your plugin runs seamlessly whether MongoDB is configured or falling back to local JSON storage (`local_db.json`).
+Altruix abstracts database operations so your plugin runs seamlessly whether MongoDB is configured or falling back to embedded SQLite storage (`sqlite:///altruix.db`).
 
 ```python
 # Access collection

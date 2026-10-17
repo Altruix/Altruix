@@ -166,3 +166,4 @@ Main/assets/images/logo.jpg
 /XtraPluginsAI
 *.db
 /plug
+sessions_backup/
