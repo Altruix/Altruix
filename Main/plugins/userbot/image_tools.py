@@ -6,13 +6,15 @@
 #
 # All rights reserved.
 
+import os
+import time
 from os import remove
 from Main import Altruix
 from random import choice
 from os.path import exists
-from pyrogram import Client
+from pathlib import Path
+from Main.core.types import AltruixTelegramClient as Client, Message
 from time import perf_counter as pc
-from Main.core.types.message import Message
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -103,25 +105,31 @@ async def logo(c: Client, m: Message):
     start_ = pc()
     await m.handle_message("PROCESSING")
     text, size, RGB = splitter(m.user_input or "")
-    img = Image.open("./Main/assets/images/blank_black.png")
+    asset_dir = Path(__file__).resolve().parents[2] / "assets"
+    img = Image.open(asset_dir / "images" / "blank_black.png")
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype("./Main/assets/fonts/Streamster.ttf", size)
+    font = ImageFont.truetype(asset_dir / "fonts" / "Streamster.ttf", size)
     img_w, img_h = img.size
-    w_, h_ = draw.textsize(text, font)
+    try:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        w_, h_ = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    except AttributeError:
+        w_, h_ = draw.textsize(text, font)
     h_ += int(h_ * 0.25)
-    draw.text(((img_w - w_) / 2, (img_h - h_) / 2), text, RGB, font)
-    file_name = f"logo-{start_}.png"
+    temp_dir = os.path.abspath("./temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    file_name = os.path.join(temp_dir, f"logo-{int(time.time() * 1000)}.png")
     img.save(file_name, "png")
-    if m.reply_to_message:
-        msg = await c.send_document(
-            m.chat.id,
-            document=file_name,
-            file_name="logo.png",
-            reply_to_message_id=m.reply_to_message.id,
+    try:
+        rm = await m.get_reply_message() if hasattr(m, "get_reply_message") else None
+        reply_to = rm.id if rm else (m.reply_to_msg_id or None)
+        msg = await c.send_file(
+            m.chat_id,
+            file=file_name,
+            caption=f"Took <code>{round(pc()-start_, 2)}</code>s.",
+            reply_to=reply_to,
         )
-    else:
-        msg = await c.send_document(m.chat.id, document=file_name, file_name="logo.png")
-    await m.delete()
-    if exists(file_name):
-        remove(file_name)
-    await msg.edit_msg(f"Took <code>{round(pc()-start_, 2)}</code>s.")
+        await m.delete()
+    finally:
+        if exists(file_name):
+            remove(file_name)

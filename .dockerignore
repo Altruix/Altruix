@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+__pycache__
+*.py[cod]
+*.session
+*.session-journal
+.env
+*.env
+local_db.json
+altruix.log
+cache
+dist
+build

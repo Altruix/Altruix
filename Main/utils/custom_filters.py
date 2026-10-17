@@ -6,52 +6,221 @@
 #
 # All rights reserved.
 
+from __future__ import annotations
 
 import re
-import Main
-from pyrogram import filters
-from pyrogram.types import Message
-from .file_helpers import run_in_exc
+import contextlib
+from Main.utils.suppress import suppress_error
+from typing import Any, Callable, List, Optional, Union
 
 
-@run_in_exc
-def parse_(client, message: Message, cmd, disable_sudo=False):
-    sudo_cmd_handler = Main.Altruix.sudo_cmd_handler
-    sd_list = [] if disable_sudo else Main.Altruix.config.SUDO_USERS
-    user_cmd_handler = Main.Altruix.user_command_handler
-    try:
-        if not message.text:
+class Filter:
+    """Composable filter object supporting &, |, ~ operators."""
+
+    def __init__(self, check_func: Callable[[Any, Any], bool]):
+        self.check_func = check_func
+
+    async def __call__(self, client: Any, message: Any) -> bool:
+        try:
+            res = self.check_func(client, message)
+        except TypeError:
+            try:
+                res = self.check_func(self, client, message)
+            except TypeError:
+                res = self.check_func(message)
+        if hasattr(res, "__await__"):
+            return await res
+        return bool(res)
+
+    def __and__(self, other: Filter) -> Filter:
+        async def combined(c: Any, m: Any) -> bool:
+            return (await self(c, m)) and (await other(c, m))
+        return Filter(combined)
+
+    def __or__(self, other: Filter) -> Filter:
+        async def combined(c: Any, m: Any) -> bool:
+            return (await self(c, m)) or (await other(c, m))
+        return Filter(combined)
+
+    def __invert__(self) -> Filter:
+        async def inverted(c: Any, m: Any) -> bool:
+            return not (await self(c, m))
+        return Filter(inverted)
+
+
+def create(check_func: Callable) -> Filter:
+    return Filter(check_func)
+
+
+class Filters:
+    """Namespace of common filter builders for Telethon message events."""
+
+    @staticmethod
+    def command(commands: Union[str, List[str]], prefixes: Union[str, List[str]] = "/") -> Filter:
+        if isinstance(commands, str):
+            commands = [commands]
+        if isinstance(prefixes, str):
+            prefixes = list(prefixes)
+
+        def check(client: Any, message: Any) -> bool:
+            text = getattr(message, "text", None) or getattr(message, "raw_text", None) or getattr(message, "message", None) or ""
+            if not text:
+                return False
+            for p in prefixes:
+                for cmd in commands:
+                    prefix_cmd = f"{p}{cmd}".lower()
+                    if text.lower() == prefix_cmd or text.lower().startswith(f"{prefix_cmd} ") or text.lower().startswith(f"{prefix_cmd}\n"):
+                        return True
             return False
-        reg = re.search(
-            r"^([\!\"\#\$\%\&\'\(\)\*\+\,\-\.\/\:\;\<\>\=\?\@\[\]\{\}\\\\\^\_\`\~])(\w+)(?:(?:.|\n)+)?$",
-            message.text,
-        )
-        if (
-            (((message.from_user and message.from_user.is_self) or message.outgoing))
-            and message.text
-            and reg[1] == user_cmd_handler
-            and reg[2] in cmd
-        ):
-            return True
-        elif (
-            message.from_user
-            and message.from_user.id in sd_list
-            and message.text
-            and reg[1] == sudo_cmd_handler
-            and reg[2] in cmd
-        ):
-            return True
+
+        return Filter(check)
+
+    @staticmethod
+    def regex(pattern: Union[str, re.Pattern], flags: int = 0) -> Filter:
+        comp = re.compile(pattern, flags) if isinstance(pattern, str) else pattern
+
+        def check(client: Any, message: Any) -> bool:
+            # For callback query events, message.data is the button payload (bytes or str)
+            data = getattr(message, "data", None)
+            if data is not None:
+                text = data.decode("utf-8", errors="ignore") if isinstance(data, bytes) else str(data)
+            else:
+                text = (
+                    getattr(message, "text", None)
+                    or getattr(message, "raw_text", None)
+                    or getattr(message, "message", None)
+                )
+                if isinstance(text, bytes):
+                    text = text.decode("utf-8", errors="ignore")
+                elif text is not None and not isinstance(text, str):
+                    text = str(text)
+
+            if text is None:
+                return False
+            match = comp.search(str(text))
+            if match:
+                with suppress_error(msg="setting matches on message"):
+                    setattr(message, "matches", [match])
+                    setattr(message, "pattern_match", match)
+                return True
+            return False
+
+        return Filter(check)
+
+    @staticmethod
+    def user(users: Union[int, str, List[Union[int, str]]]) -> Filter:
+        if isinstance(users, (int, str)):
+            user_list = [int(users)] if str(users).lstrip("-").isdigit() else [users]
         else:
+            user_list = [int(u) if str(u).lstrip("-").isdigit() else u for u in users]
+
+        def check(client: Any, message: Any) -> bool:
+            sender_id = getattr(message, "sender_id", None)
+            if sender_id is not None and sender_id in user_list:
+                return True
+            sender = getattr(message, "from_user", None) or getattr(message, "sender", None)
+            if sender:
+                if getattr(sender, "id", None) in user_list:
+                    return True
+                if getattr(sender, "username", None) in user_list:
+                    return True
             return False
-    except Exception:
+
+        return Filter(check)
+
+    @staticmethod
+    def _private(client: Any, message: Any) -> bool:
+        if hasattr(message, "is_private"):
+            return bool(message.is_private)
+        chat = getattr(message, "chat", None)
+        return getattr(chat, "type", "") == "private"
+
+    @staticmethod
+    def _group(client: Any, message: Any) -> bool:
+        if hasattr(message, "is_group"):
+            return bool(message.is_group)
+        chat = getattr(message, "chat", None)
+        return getattr(chat, "type", "") in {"group", "supergroup"}
+
+    @staticmethod
+    def _channel(client: Any, message: Any) -> bool:
+        if hasattr(message, "is_channel"):
+            return bool(message.is_channel)
+        chat = getattr(message, "chat", None)
+        return getattr(chat, "type", "") == "channel"
+
+    @staticmethod
+    def _mentioned(client: Any, message: Any) -> bool:
+        return bool(getattr(message, "mentioned", False))
+
+    @staticmethod
+    def _new_chat_members(client: Any, message: Any) -> bool:
+        if getattr(message, "user_joined", False) or getattr(message, "user_added", False):
+            return True
+        action = getattr(message, "action", None)
+        if action and type(action).__name__ in {"MessageActionChatAddUser", "MessageActionChatJoinedByLink"}:
+            return True
         return False
 
+    private = Filter(_private)
+    group = Filter(_group)
+    channel = Filter(_channel)
+    mentioned = Filter(_mentioned)
+    new_chat_members = Filter(_new_chat_members)
+    all = Filter(lambda c, m: True)
+    create = staticmethod(create)
 
-def user_filters(cmd, disable_sudo=False):
-    async def s_f(f, client, message):
-        f_out = await parse_(
-            client=client, message=message, cmd=cmd, disable_sudo=disable_sudo
-        )
-        return f_out
 
-    return filters.create(s_f)
+filters = Filters()
+
+
+def user_filters(cmd: Union[str, List[str]], disable_sudo: bool = False) -> Filter:
+    """Filter that matches self user commands and sudo commands."""
+    if isinstance(cmd, str):
+        cmd = [cmd]
+    cmd_set = {c.lower() for c in cmd}
+
+    async def check(client: Any, message: Any) -> bool:
+        import Main
+        altruix = Main.Altruix
+        text = getattr(message, "text", None) or getattr(message, "raw_text", None) or getattr(message, "message", None) or ""
+        if not text:
+            return False
+
+        user_prefix = getattr(altruix, "user_command_handler", ".")
+        sudo_prefix = getattr(altruix, "sudo_cmd_handler", "!")
+        disabled_commands = getattr(altruix, "disabled_sudo_plugin_list", []) or []
+        if isinstance(disabled_commands, str):
+            disabled_commands = [item.strip() for item in disabled_commands.split(",") if item.strip()]
+        disabled_commands = {str(item).strip().lower() for item in disabled_commands}
+        sudo_disabled = disable_sudo or bool(cmd_set.intersection(disabled_commands))
+        sudo_users = [] if sudo_disabled else getattr(altruix.config, "SUDO_USERS", [])
+
+        # Match command format: prefix + word
+        first_token = text.split()[0]
+        if not first_token:
+            return False
+
+        prefix = first_token[0]
+        command_name = first_token[1:].lower()
+
+        is_self = getattr(message, "out", False)
+        if not is_self and hasattr(message, "from_user") and message.from_user:
+            is_self = getattr(message.from_user, "is_self", False)
+        if not is_self and hasattr(client, "myself") and client.myself:
+            sender_id = getattr(message, "sender_id", None)
+            if sender_id and sender_id == client.myself.id:
+                is_self = True
+
+        # Self user commands
+        if is_self and prefix == user_prefix and command_name in cmd_set:
+            return True
+
+        # Sudo user commands
+        sender_id = getattr(message, "sender_id", None)
+        if sender_id and sender_id in sudo_users and prefix == sudo_prefix and command_name in cmd_set:
+            return True
+
+        return False
+
+    return Filter(check)

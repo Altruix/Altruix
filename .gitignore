@@ -12,6 +12,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+temp/
 eggs/
 .eggs/
 lib/
@@ -58,6 +59,7 @@ coverage.xml
 # Django stuff:
 *.log
 local_settings.py
+local_db.json
 db.sqlite3
 db.sqlite3-journal
 
@@ -138,6 +140,7 @@ dmypy.json
 
 # Altruix
 *.env
+!example.env
 *.session
 *.session-journal
 altruix.log

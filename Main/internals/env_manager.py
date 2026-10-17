@@ -18,10 +18,10 @@ from Main.core.types.message import Message
     },
     requires_input=True,
 )
-async def add_env_cmd_handler(c: Altruix, m: Message):
+async def add_env_cmd_handler(c, m: Message):
     ms = await m.handle_message("PROCESSING")
     input_ = m.user_input
-    if " " not in input_:
+    if not input_ or " " not in input_:
         return await ms.edit_msg("PROPER_INPUT_REQ")
     env_key, value = input_.split(" ", maxsplit=1)
     await Altruix.config.sync_env_to_db(env_key, value)
@@ -36,13 +36,13 @@ async def add_env_cmd_handler(c: Altruix, m: Message):
     },
     requires_input=True,
 )
-async def del_env_cmd_handler(c: Altruix, m: Message):
+async def del_env_cmd_handler(c, m: Message):
     ms = await m.handle_message("PROCESSING")
-    input_ = m.user_input
+    input_ = m.user_input.strip()
     if not await Altruix.config.get_env(input_):
-        return await ms.edit_msg("NO_ENV_FOUND", string_args=(input))
+        return await ms.edit_msg("NO_ENV_FOUND", string_args=(input_,))
     await Altruix.config.del_env_from_db(input_)
-    await ms.edit_msg("ENV_DELETED", string_args=(input_))
+    await ms.edit_msg("ENV_DELETED", string_args=(input_,))
 
 
 @Altruix.register_on_cmd(
@@ -50,10 +50,10 @@ async def del_env_cmd_handler(c: Altruix, m: Message):
     cmd_help={"help": "Gets env from database!", "example": "getenv env_varname"},
     requires_input=True,
 )
-async def get_env_cmd_handler(c: Altruix, m: Message):
+async def get_env_cmd_handler(c, m: Message):
     ms = await m.handle_message("PROCESSING")
-    input_ = m.user_input
+    input_ = m.user_input.strip()
     value = await Altruix.config.get_env(input_)
     if not value:
-        return await ms.edit_msg("NO_ENV_FOUND", string_args=(input))
+        return await ms.edit_msg("NO_ENV_FOUND", string_args=(input_,))
     await ms.edit_msg("ENV_VALUE", string_args=(input_, value))

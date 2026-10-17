@@ -7,7 +7,7 @@
 # All rights reserved.
 
 from Main import Altruix
-from ..utils._updater import *
+from Main.utils._updater import *
 from Main.core.types.message import Message
 
 

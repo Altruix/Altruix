@@ -6,31 +6,35 @@
 #
 # All rights reserved.
 
+from __future__ import annotations
 
+import os
 import re
 import dotenv
-import asyncio
 import logging
 import pathlib
 import contextlib
-from os import getenv
 from functools import wraps
-from motor.core import AgnosticCollection
-from asyncio.events import AbstractEventLoop
 from typing import Any, List, Union, Optional
+from asyncio.events import AbstractEventLoop
+
 from .exceptions import NoDatabaseConnected, EnvVariableTypeError
 
-
 dotenv.load_dotenv()
+logger = logging.getLogger("altruix.config")
 
 
-def digit_wrap(digit):
+def digit_wrap(digit: Any) -> Union[int, Any]:
+    if digit is None:
+        return None
     with contextlib.suppress(Exception):
-        return int(digit)
+        val = str(digit).strip()
+        if val.lstrip("-").isdigit():
+            return int(val)
     return digit
 
 
-class TGLIMITS(object):
+class TGLIMITS:
     # Accounts
     MAX_USERNAME = 32
     MIN_USERNAME = 5
@@ -43,200 +47,298 @@ class TGLIMITS(object):
     FILE_SIZE_LIMIT = 2  # GB
 
 
-class BaseConfig(object):
-    BOT_TOKEN = getenv("BOT_TOKEN")
-    BOT_MODE = getenv("BOT_MODE", False)
-    AUTOPOST_CACHE = {}
-    CUSTOM_BOT_MEDIA = getenv("CUSTOM_BOT_MEDIA")
+class BaseConfig:
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    BOT_MODE = os.getenv("BOT_MODE", "false").lower() in {"true", "yes", "enable", "1"}
+    AUTOPOST_CACHE: dict = {}
+    CUSTOM_BOT_MEDIA = os.getenv("CUSTOM_BOT_MEDIA")
     OWNER_ID = (
-        int(getenv("OWNER_ID"))
-        if getenv("OWNER_ID") and getenv("OWNER_ID").isdigit()
-        else None
+        int(os.getenv("OWNER_ID"))
+        if os.getenv("OWNER_ID") and os.getenv("OWNER_ID").strip().lstrip("-").isdigit()
+        else 0
     )
-    LOAD_ENV_TO_DB = getenv("LOAD_ENV_TO_DB", False)
-    CUSTOM_BT_START_MSG = getenv("CUSTOM_BT_START_MSG", "")
-    SESSIONS = [i for i in getenv("SESSIONS", "").split(" ") if i != "" or None]
-    API_ID = int(getenv("API_ID"))
-    DISABLED_SUDO_CMD_LIST = []
-    API_HASH = getenv("API_HASH")
-    HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
-    HELP_MENU_ROWS = int(getenv("HELP_MENU_ROWS", 6))
-    HELP_MENU_COLUMNS = int(getenv("HELP_MENU_COLUMNS", 3))
+    LOAD_ENV_TO_DB = os.getenv("LOAD_ENV_TO_DB", "false").lower() in {"true", "yes", "1"}
+    CUSTOM_BT_START_MSG = os.getenv("CUSTOM_BT_START_MSG", "")
+    SESSIONS = [i for i in os.getenv("SESSIONS", "").split(" ") if i.strip()]
+    API_ID = (
+        int(os.getenv("API_ID"))
+        if os.getenv("API_ID") and os.getenv("API_ID").strip().isdigit()
+        else 0
+    )
+    DISABLED_SUDO_CMD_LIST: List[str] = []
+    API_HASH = os.getenv("API_HASH", "")
+    HEROKU_APP_NAME = os.getenv("HEROKU_APP_NAME")
+    HELP_MENU_ROWS = int(os.getenv("HELP_MENU_ROWS", 6)) if str(os.getenv("HELP_MENU_ROWS", "6")).isdigit() else 6
+    HELP_MENU_COLUMNS = int(os.getenv("HELP_MENU_COLUMNS", 3)) if str(os.getenv("HELP_MENU_COLUMNS", "3")).isdigit() else 3
 
     DEFAULT_REPO = "https://github.com/Altruix/Altruix"
-    HEROKU_API_KEY = getenv("HEROKU_API_KEY")
-    REPO = getenv("CUSTOM_REPO") or DEFAULT_REPO
+    HEROKU_API_KEY = os.getenv("HEROKU_API_KEY")
+    REPO = os.getenv("CUSTOM_REPO") or DEFAULT_REPO
 
-    UPDATE_ON_STARTUP = (
-        False
-        if (getenv("UPDATE_ON_STARTUP", "yes").lower() in ["n", "nope", "false"])
-        else True
-    )
-    DB_NAME = "mongo"
-    DB_URI = getenv("DB_URI")
-    RESOURCE_SAVER = getenv("RESOURCE_SAVER") or "true"
-    DEBUG = True if getenv("DEBUG", "false").lower() == "true" else False
-    LOG_CHAT_ID = digit_wrap(getenv("LOG_CHAT_ID", None))
-    UB_LANG = getenv("UB_LANG")
-    SUDO_CMD_HANDLER = getenv("SUDO_CMD_HANDLER") or "!"
-    CMD_HANDLER = getenv("CMD_HANDLER") or "."
-    try:
-        SUDO_USERS = [
-            int(i) for i in getenv("SUDO_USERS", "").split(" ") if i.isdigit()
+    UPDATE_ON_STARTUP = os.getenv("UPDATE_ON_STARTUP", "false").strip().lower() in {
+        "true", "yes", "1", "on"
+    }
+    DB_NAME = os.getenv("DB_NAME", "Altruix")
+    DB_URI = os.getenv("DB_URI")
+    RESOURCE_SAVER = os.getenv("RESOURCE_SAVER") or "true"
+    DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+    LOG_CHAT_ID = digit_wrap(os.getenv("LOG_CHAT_ID", None))
+    UB_LANG = os.getenv("UB_LANG")
+    SUDO_CMD_HANDLER = os.getenv("SUDO_CMD_HANDLER") or "!"
+    CMD_HANDLER = os.getenv("CMD_HANDLER") or "."
+    SUDO_USERS: List[int] = [
+        int(i)
+        for i in os.getenv("SUDO_USERS", "").split(" ")
+        if i.strip().lstrip("-").isdigit()
+    ]
+
+    ALIVE_MEDIA = os.getenv("ALIVE_MEDIA")
+
+    def reload_from_env(self) -> None:
+        """Dynamically load or reload all environment variables into this config instance."""
+        self.BOT_TOKEN = os.getenv("BOT_TOKEN")
+        self.BOT_MODE = os.getenv("BOT_MODE", "false").lower() in {"true", "yes", "enable", "1"}
+        self.CUSTOM_BOT_MEDIA = os.getenv("CUSTOM_BOT_MEDIA")
+        self.OWNER_ID = (
+            int(os.getenv("OWNER_ID"))
+            if os.getenv("OWNER_ID") and os.getenv("OWNER_ID").strip().lstrip("-").isdigit()
+            else 0
+        )
+        self.LOAD_ENV_TO_DB = os.getenv("LOAD_ENV_TO_DB", "false").lower() in {"true", "yes", "1"}
+        self.CUSTOM_BT_START_MSG = os.getenv("CUSTOM_BT_START_MSG", "")
+        self.SESSIONS = [i for i in os.getenv("SESSIONS", "").split(" ") if i.strip()]
+        self.API_ID = (
+            int(os.getenv("API_ID"))
+            if os.getenv("API_ID") and os.getenv("API_ID").strip().isdigit()
+            else 0
+        )
+        self.DISABLED_SUDO_CMD_LIST = []
+        self.API_HASH = os.getenv("API_HASH", "")
+        self.HEROKU_APP_NAME = os.getenv("HEROKU_APP_NAME")
+        self.HELP_MENU_ROWS = int(os.getenv("HELP_MENU_ROWS", 6)) if str(os.getenv("HELP_MENU_ROWS", "6")).isdigit() else 6
+        self.HELP_MENU_COLUMNS = int(os.getenv("HELP_MENU_COLUMNS", 3)) if str(os.getenv("HELP_MENU_COLUMNS", "3")).isdigit() else 3
+        self.DEFAULT_REPO = "https://github.com/Altruix/Altruix"
+        self.HEROKU_API_KEY = os.getenv("HEROKU_API_KEY")
+        self.REPO = os.getenv("CUSTOM_REPO") or self.DEFAULT_REPO
+        self.UPDATE_ON_STARTUP = os.getenv("UPDATE_ON_STARTUP", "false").strip().lower() in {
+            "true", "yes", "1", "on"
+        }
+        self.DB_NAME = os.getenv("DB_NAME", "Altruix")
+        self.DB_URI = os.getenv("DB_URI")
+        self.RESOURCE_SAVER = os.getenv("RESOURCE_SAVER") or "true"
+        self.DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+        self.LOG_CHAT_ID = digit_wrap(os.getenv("LOG_CHAT_ID", None))
+        self.UB_LANG = os.getenv("UB_LANG")
+        self.SUDO_CMD_HANDLER = os.getenv("SUDO_CMD_HANDLER") or "!"
+        self.CMD_HANDLER = os.getenv("CMD_HANDLER") or "."
+        self.SUDO_USERS = [
+            int(i)
+            for i in os.getenv("SUDO_USERS", "").split(" ")
+            if i.strip().lstrip("-").isdigit()
         ]
-    except Exception:
-        raise EnvVariableTypeError(Exception)
+        self.ALIVE_MEDIA = os.getenv("ALIVE_MEDIA")
 
-    ALIVE_MEDIA = getenv("ALIVE_MEDIA")
+    def digit_wrap(self, digit_: Any) -> Union[str, int]:
+        return digit_wrap(digit_)
+
+    async def get_env(self, env_key: str, as_list: bool = False) -> Any:
+        env_key = env_key.strip().upper()
+        env_ = os.getenv(env_key)
+        if env_ and as_list:
+            return list(env_.split("|"))
+        if env_ and "|" in env_:
+            return list(env_.split("|"))
+        if env_ is not None:
+            return env_
+        return getattr(self, env_key, None)
 
     def pop_session(self, index: int) -> Optional[str]:
         if len(self.SESSIONS) == 0:
-            raise Exception("No sessions to pop")
-        if index <= len(self.SESSIONS):
-            for trials in range(5):
-                try:
-                    popped = self.SESSIONS.pop(index)
-                    logging.info("Successfully Popped session.")
-                    break
-                except IndexError as e:
-                    logging.warning(f"Index {index} is out of range. Retrying...")
-                    if trials == 4:
-                        raise Exception("Could not pop session") from e
-                    continue
+            raise ValueError("No sessions to pop")
+        if index < len(self.SESSIONS):
+            popped = self.SESSIONS.pop(index)
+            logger.info("Successfully popped session.")
         else:
-            print("\n")
-            logging.error("Session index out of range.")
-            quit(1)
-        env_path = pathlib.Path().cwd().joinpath(".env")
+            logger.error("Session index out of range.")
+            return None
+
+        env_path = pathlib.Path.cwd().joinpath(".env")
         if not env_path.exists():
-            return
-        with open(env_path, "r") as f:
-            raw_data = f.read()
-        with open(env_path, "w") as f:
-            if re.search(r"SESSIONS=(?:[^\r\n\t\f\v]+)?", raw_data):
-                new_data = re.sub(
-                    r"SESSIONS=(?:[^\r\n\t\f\v]+)?",
-                    f"SESSIONS={' '.join(self.SESSIONS)}",
-                    raw_data,
-                )
-            else:
-                new_data = f'{raw_data}\nSESSIONS={" ".join(self.SESSIONS)}'
-            f.write(new_data)
-        logging.info("The unstable session was removed successfully")
+            return popped
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                raw_data = f.read()
+            with open(env_path, "w", encoding="utf-8") as f:
+                if re.search(r"SESSIONS=(?:[^\r\n\t\f\v]+)?", raw_data):
+                    new_data = re.sub(
+                        r"SESSIONS=(?:[^\r\n\t\f\v]+)?",
+                        f"SESSIONS={' '.join(self.SESSIONS)}",
+                        raw_data,
+                    )
+                else:
+                    new_data = f'{raw_data}\nSESSIONS={" ".join(self.SESSIONS)}'
+                f.write(new_data)
+            logger.info("Session removed from .env")
+        except Exception as e:
+            logger.warning("Failed to update .env: %s", e)
         return popped
 
     def append_session(self, session: str) -> None:
         if session not in self.SESSIONS:
-            env_path = pathlib.Path().cwd().joinpath(".env")
+            self.SESSIONS.append(session)
+            env_path = pathlib.Path.cwd().joinpath(".env")
             if not env_path.exists():
                 return
-            self.SESSIONS.append(session)
-            with open(env_path, "r") as f:
-                raw_data = f.read()
-            with open(env_path, "w") as f:
-                new_data = re.sub(
-                    r"SESSIONS=(?:[^\r\n\t\f\v]+)?",
-                    f"SESSIONS={' '.join(self.SESSIONS)}",
-                    raw_data,
-                )
-                f.write(new_data)
-            logging.info("New session was successfully written to .env")
-            return
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    raw_data = f.read()
+                with open(env_path, "w", encoding="utf-8") as f:
+                    if re.search(r"SESSIONS=(?:[^\r\n\t\f\v]+)?", raw_data):
+                        new_data = re.sub(
+                            r"SESSIONS=(?:[^\r\n\t\f\v]+)?",
+                            f"SESSIONS={' '.join(self.SESSIONS)}",
+                            raw_data,
+                        )
+                    else:
+                        new_data = f'{raw_data}\nSESSIONS={" ".join(self.SESSIONS)}'
+                    f.write(new_data)
+                logger.info("New session successfully appended to .env")
+            except Exception as e:
+                logger.warning("Failed to append session to .env: %s", e)
 
 
 def var_check(func):
     @wraps(func)
-    async def var_check(*args, **kwargs):
+    async def wrapper(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
         except Exception as e:
             raise EnvVariableTypeError(e) from e
 
-    return var_check
+    return wrapper
 
 
 class Config(BaseConfig):
     def __init__(
-        self, env_col: AgnosticCollection = None, loop: AbstractEventLoop = None, **args
+        self,
+        env_col: Optional[Any] = None,
+        loop: Optional[AbstractEventLoop] = None,
+        executor: Optional[Any] = None,
+        **args,
     ) -> None:
-        if env_col is None:
-            raise NoDatabaseConnected(
-                "Please add database uri, So that the Userbot can function!"
-            )
-        self.env_col: AgnosticCollection = env_col
-        self.loop = asyncio.get_event_loop() if loop is None else loop
-        self.loop.run_until_complete(self.get_sudo())
-        self.loop.run_until_complete(self.load_vars_from_db())
-        self.loop.run_until_complete(self.load_envs_to_db())
+        self.env_col = env_col
+        self.loop = loop
+        self._executor = executor
+        self.reload_from_env()
 
-    def digit_wrap(self, digit_: str) -> Union[str, int]:
-        try:
-            return int(digit_)
-        except (ValueError, TypeError):
-            return digit_
+    async def init_db_vars(self) -> None:
+        if self.env_col is not None:
+            await self.get_sudo()
+            await self.load_vars_from_db()
+            await self.load_envs_to_db()
 
-    # to set pm_permit by defualt true, if the var is false then false
+    def digit_wrap(self, digit_: Any) -> Union[str, int]:
+        return digit_wrap(digit_)
 
-    async def load_envs_to_db(self):
+    async def load_envs_to_db(self) -> None:
+        if self.env_col is None:
+            return
         if env_ := await self.get_env("LOAD_ENV_TO_DB"):
-            if env_.lower() == "true":
+            if str(env_).lower() in {"true", "yes", "1"}:
                 for k in dir(BaseConfig):
                     v = getattr(BaseConfig, k)
                     if (
                         not callable(v)
                         and k
-                        and k[:1] != "_"
+                        and not k.startswith("_")
                         and v is not None
-                        and str(k).strip() not in [None, {}, [], "", " "]
-                        and str(v).strip() not in [None, {}, [], "", " "]
+                        and str(k).strip() not in {"", " "}
                         and not str(k).lower().startswith("default")
                     ):
                         with contextlib.suppress(Exception):
-                            await self.sync_env_to_db(
-                                self.digit_wrap(k), self.digit_wrap(v)
-                            )
-                logging.info("Loaded ENV(s) to database!")
+                            await self.sync_env_to_db(k, v)
+                logger.info("Loaded environment variables to database!")
 
-    async def load_vars_from_db(self):
-        async for var in self.env_col.find({}):
-            setattr(self, var.get("_id"), var.get("env_value"))
+    async def load_vars_from_db(self) -> None:
+        if self.env_col is None:
+            return
+        try:
+            async for var in self.env_col.find({}):
+                setattr(self, var.get("_id"), var.get("env_value"))
+        except Exception as e:
+            logger.warning("Error loading vars from DB: %s", e)
 
-    async def get_env(self, env_key, as_list=False):
+    async def get_env(self, env_key: str, as_list: bool = False) -> Any:
         env_key = env_key.strip().upper()
-        return (
-            await self.get_env_from_db(env_key)
-            or self.get_env_(env_key, as_list)
-            or super().__getattribute__(env_key)
-        )
+        from_db = await self.get_env_from_db(env_key)
+        if from_db is not None:
+            return from_db
+        from_env = self.get_env_(env_key, as_list)
+        if from_env is not None:
+            return from_env
+        return getattr(self, env_key, None)
 
-    def get_env_(self, env_key, as_list):
-        env_ = getenv(env_key)
+    def get_env_(self, env_key: str, as_list: bool) -> Any:
+        env_ = os.getenv(env_key)
         if env_ and as_list:
             return list(env_.split("|"))
         if env_ and "|" in env_:
             return list(env_.split("|"))
         return env_
 
-    async def get_env_from_db(self, env_name):
-        if var := await self.env_col.find_one({"_id": env_name}):
-            return (
-                list(var.get("env_value"))
-                if isinstance(var.get("env_value"), list)
-                else var.get("env_value")
-            )
+    async def get_env_from_db(self, env_name: str) -> Any:
+        if self.env_col is None:
+            return None
+        try:
+            if var := await self.env_col.find_one({"_id": env_name}):
+                val = var.get("env_value")
+                return list(val) if isinstance(val, list) else val
+        except Exception:
+            pass
+        return None
 
-    async def del_env_from_db(self, env_name):
-        if await self.env_col.find_one({"_id": env_name}):
-            await self.env_col.find_one_and_delete({"_id": env_name})
-            return True
+    async def del_env_from_db(self, env_name: str) -> bool:
+        if self.env_col is None:
+            return False
+        try:
+            if await self.env_col.find_one({"_id": env_name}):
+                await self.env_col.find_one_and_delete({"_id": env_name})
+                return True
+        except Exception:
+            pass
         return False
 
+    async def unsync_env_to_db(self, env_name: str, values: Any) -> List[Any]:
+        """Remove one or more values from a list-valued environment setting."""
+        if self.env_col is None or self.DEBUG:
+            return []
+        current = await self.get_env_from_db(env_name)
+        if current is None:
+            return []
+        current_values = current if isinstance(current, list) else [current]
+        remove_values = values if isinstance(values, (list, tuple, set)) else [values]
+        remove_keys = {str(value).strip().casefold() for value in remove_values}
+        remaining = [
+            value for value in current_values
+            if str(value).strip().casefold() not in remove_keys
+        ]
+        if remaining == current_values:
+            return remaining
+        if remaining:
+            await self.add_env_to_db(env_name, remaining, upsert=True)
+        else:
+            await self.del_env_from_db(env_name)
+        return remaining
+
     async def add_env_to_db(
-        self, env_name, update: Union[str, int, List[Any], dict], upsert: bool = False
+        self, env_name: str, update: Union[str, int, List[Any], dict], upsert: bool = False
     ) -> None:
         if self.DEBUG:
-            logging.info("DEBUG mode is enabled, skipping db syncing...")
-        elif isinstance(update, dict):
+            logger.info("DEBUG mode enabled, skipping DB syncing...")
+            return
+        if self.env_col is None:
+            return
+        if isinstance(update, dict):
             await self.env_col.find_one_and_update(
                 {"_id": "SUDO_USERS"}, update, upsert=upsert
             )
@@ -245,90 +347,83 @@ class Config(BaseConfig):
                 {"_id": env_name}, {"$set": {"env_value": update}}, upsert=upsert
             )
 
-    async def add_element_to_list(self, env_name, value):
+    async def add_element_to_list(self, env_name: str, value: Any) -> None:
         if self.DEBUG:
-            logging.info("DEBUG mode is enabled, skipping db syncing...")
+            logger.info("DEBUG mode enabled, skipping DB syncing...")
+            return
+        if self.env_col is None:
+            return
+        await self.env_col.find_one_and_update(
+            {"_id": env_name}, {"$addToSet": {"env_value": value}}, upsert=True
+        )
 
-        else:
-            await self.env_col.find_one_and_update(
-                {"_id": env_name}, {"$addToSet": {"env_value": value}}, upsert=True
-            )
-
-    async def pop_element_from_list(self, env_name, value):
+    async def pop_element_from_list(self, env_name: str, value: Any) -> None:
+        if self.env_col is None:
+            return
         await self.env_col.find_one_and_update(
             {"_id": env_name}, {"$pull": {"env_value": value}}
         )
 
-    async def unsync_env_to_db(self, env_name, env_value, upsert=False):
-        if env_ := await self.get_env_from_db(env_name):
-            if isinstance(env_value, list):
-                for i in env_value:
-                    if i in env_:
-                        await self.env_col.find_one_and_update(
-                            {"_id": env_name},
-                            {"$pull": {"env_value": i}},
-                            upsert=upsert,
-                        )
-            elif env_value in env_:
-                return await self.env_col.find_one_and_update(
-                    {"_id": env_name},
-                    {"$pull": {"env_value": env_value}},
-                    upsert=upsert,
-                )
-
-    async def sync_env_to_db(self, env_name, env_value, upsert=False, push_=False):
-        if await self.get_env_from_db(env_name):
-            if push_:
-                if not isinstance(env_value, list):
-                    return await self.env_col.find_one_and_update(
-                        {"_id": env_name},
-                        {"$push": {"env_value": env_value}},
-                        upsert=upsert,
-                    )
-                for i in env_value:
-                    await self.env_col.find_one_and_update(
-                        {"_id": env_name},
-                        {"$push": {"env_value": i}},
-                        upsert=upsert,
-                    )
+    async def sync_env_to_db(
+        self, env_name: str, env_value: Any, upsert: bool = False, push_: bool = False
+    ) -> Any:
+        if self.env_col is None:
+            return None
+        existing = await self.get_env_from_db(env_name)
+        if push_:
+            current = existing if isinstance(existing, list) else ([] if existing is None else [existing])
+            incoming = env_value if isinstance(env_value, list) else [env_value]
+            updated = list(current)
+            for item in incoming:
+                if item not in updated:
+                    updated.append(item)
+            return await self.env_col.find_one_and_update(
+                {"_id": env_name}, {"$set": {"env_value": updated}}, upsert=True
+            )
+        if existing is not None:
             return await self.env_col.find_one_and_update(
                 {"_id": env_name}, {"$set": {"env_value": env_value}}, upsert=upsert
             )
-        if push_:
-            env_value = [env_value]
         return await self.env_col.insert_one({"_id": env_name, "env_value": env_value})
 
     @var_check
     async def add_sudo(self, user_id: Union[int, str, List[Union[int, str]]]) -> None:
         if isinstance(user_id, int):
             user_id = [user_id]
-        if isinstance(user_id, str):
+        elif isinstance(user_id, str):
             user_id = [int(user_id)]
-        if isinstance(user_id, list):
+        elif isinstance(user_id, list):
             user_id = [int(i) for i in user_id]
         await self.add_env_to_db(
             "SUDO_USERS", {"$push": {"user_ids": {"$each": user_id}}}, upsert=True
         )
 
     @var_check
-    async def get_sudo(self):
-        users = []
-        if var := await self.env_col.find_one({"_id": "SUDO_USERS"}):
-            if var.get("user_ids"):
-                users.extend([int(i) for i in var.get("user_ids")])
+    async def get_sudo(self) -> List[int]:
+        users: List[int] = []
+        if self.env_col is not None:
+            try:
+                if var := await self.env_col.find_one({"_id": "SUDO_USERS"}):
+                    if var.get("user_ids"):
+                        users.extend([int(i) for i in var.get("user_ids")])
+            except Exception:
+                pass
         if local_var := self.SUDO_USERS:
             users.extend(local_var)
             users = list(set(users))
-            await self.add_env_to_db("SUDO_USERS", local_var)
+            if self.env_col is not None:
+                with contextlib.suppress(Exception):
+                    await self.add_env_to_db("SUDO_USERS", local_var)
         self.SUDO_USERS = users
         return users
 
-    async def del_sudo(self, user_id):
+    async def del_sudo(self, user_id: Union[int, str]) -> None:
+        if self.env_col is None:
+            return
         await self.env_col.find_one_and_update(
-            {"_id": "SUDO_USERS"}, {"$pull": {"user_id": int(user_id)}}
+            {"_id": "SUDO_USERS"}, {"$pull": {"user_ids": int(user_id)}}
         )
 
-    async def get_pm_sts(self):
-        if await self.get_env_from_db("PM_PERMIT"):
-            return True
-        return False
+    async def get_pm_sts(self) -> bool:
+        val = await self.get_env("PM_PERMIT")
+        return bool(val and str(val).lower() in {"true", "yes", "1", "on"})

@@ -7,7 +7,7 @@
 # All rights reserved.
 
 import logging
-from ..core.config import Config as config
+from Main.core.config import Config as config
 
 
 heroku3_installed = True

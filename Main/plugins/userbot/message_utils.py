@@ -9,17 +9,23 @@
 import os
 from Main import Altruix
 from gtts import gTTS, lang
-from ...utils.file_helpers import run_in_exc
-from googletrans import LANGUAGES, Translator
-
-
-translator_2_ = Translator()
-translate_now = run_in_exc(translator_2_.translate)
+from Main.utils.file_helpers import run_in_exc
+try:
+    from googletrans import LANGUAGES, Translator
+    translator_2_ = Translator()
+    translate_now = run_in_exc(translator_2_.translate)
+except (ImportError, Exception):
+    LANGUAGES = {}
+    translator_2_ = None
+    translate_now = None
 
 
 @run_in_exc
 def tts_(to_tts, lang):
-    file_name = f"tts_{to_tts[:5]}.mp3" if len(to_tts) > 5 else f"tts_{to_tts}.mp3"
+    temp_dir = os.path.abspath("./temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    import time
+    file_name = os.path.join(temp_dir, f"tts_{int(time.time() * 1000)}.mp3")
     tts = gTTS(to_tts, lang=lang)
     tts.save(file_name)
     return file_name
@@ -35,7 +41,8 @@ def tts_(to_tts, lang):
 )
 async def tts_now(c, m):
     msg_ = await m.handle_message("PROCESSING")
-    if not m.reply_to_message.text:
+    rm = m.reply_to_message or (await m.get_reply_message() if hasattr(m, "get_reply_message") else None)
+    if not rm or not rm.text:
         return await msg_.edit_msg("INVALID_REPLY")
     input_ = m.user_input
     langs_ = lang.tts_langs()
@@ -45,7 +52,7 @@ async def tts_now(c, m):
     elif not langs_.get(lang_):
         await msg_.edit("INVALID_LANG")
         lang_ = "en"
-    file_ = await tts_(m.reply_to_message.text, lang_)
+    file_ = await tts_(rm.text, lang_)
     await m.reply_voice(
         file_,
         caption="<b>TTS </b> \n<b>Converted and processed by Altruix</b>",
@@ -63,10 +70,14 @@ async def tts_now(c, m):
 )
 async def translate_(c, m):
     _m_ = await m.handle_message("PROCESSING")
-    to_tr = m.reply_to_message.text or m.reply_to_message.caption
+    if translate_now is None:
+        return await _m_.edit_msg("Please install googletrans: <code>pip install googletrans==3.1.0a0</code>")
+    rm = m.reply_to_message or (await m.get_reply_message() if hasattr(m, "get_reply_message") else None)
+    if not rm:
+        return await _m_.edit_msg("REPLY_TO_MESSAGE")
+    to_tr = rm.text or getattr(rm, "caption", None) or getattr(rm, "message", "")
     if not to_tr:
         return await _m_.edit_msg("REPLY_TO_MESSAGE")
-    to_tr = m.reply_to_message.text or m.reply_to_message.caption
     from_lang = "auto"
     lang_to = "en"
     if m.user_input:

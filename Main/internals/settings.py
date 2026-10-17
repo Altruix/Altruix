@@ -6,148 +6,152 @@
 #
 # All rights reserved.
 
+import re
+import contextlib
+from Main.utils.suppress import suppress_error
+from typing import List, Tuple, Any
 from Main import Altruix
-from typing import List, Tuple
-from pyrogram import Client, filters
+from Main.utils.custom_filters import filters
 from Main.core.decorators import log_errors
-from Main.core.types.message import Message
-from pyrogram.types import (
-    CallbackQuery, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove,
-    InlineKeyboardButton, InlineKeyboardMarkup)
+from telethon import custom
 
 
 settings_menu_buttons = [
     [
-        InlineKeyboardButton("Sessions", callback_data="sessions_list_1"),
-        InlineKeyboardButton("Configs", callback_data="configs_home"),
+        custom.Button.inline("Sessions", b"sessions_list_1"),
+        custom.Button.inline("Configs", b"configs_home"),
     ],
 ]
 
 
 @Altruix.bot.on_callback_query(filters.regex("configs_home"))
 @log_errors
-async def configs_menu_cb_handler(c: Client, cb: CallbackQuery):
-    await cb.answer("This feature will be added soon!", show_alert=True)
+async def configs_menu_cb_handler(c, cb):
+    await cb.answer("This feature will be added soon!", alert=True)
 
 
 @Altruix.bot.on_callback_query(filters.regex("settings_menu"))
 @log_errors
-async def settings_menu_cb_handler(c: Client, m: Message):
-    await m.reply(
-        Altruix.get_string("SETTINGS_TEXT") or "<b>Settings</b>",
-        reply_markup=InlineKeyboardMarkup(settings_menu_buttons),
-        quote=True,
-    )
+async def settings_menu_cb_handler(c, cb):
+    text = Altruix.get_string("SETTINGS_TEXT") or "<b>Settings</b>"
+    await cb.edit(text, buttons=settings_menu_buttons, parse_mode="html")
 
 
-def arrange_buttons(array: list, no=5) -> List:
+def arrange_buttons(array: list, no: int = 5) -> List:
     n = int(no)
     return [array[i * n : (i + 1) * n] for i in range((len(array) + n - 1) // n)]
 
 
-def get_sessions_buttons(page=1) -> Tuple[List[InlineKeyboardButton], bool, int]:
+def get_sessions_buttons(page: int = 1) -> Tuple[List[Any], bool, int]:
     per_page = 9
     buttons = [
-        InlineKeyboardButton(str(i.myself.first_name), f"session_info_{index}_{page}")
+        custom.Button.inline(
+            str(getattr(i.myself, "first_name", f"Session {index + 1}")),
+            f"session_info_{index}_{page}".encode("utf-8"),
+        )
         for index, i in enumerate(Altruix.clients)
-    ] + [InlineKeyboardButton("\u2795 Add a session", "add_session")]
+    ] + [custom.Button.inline("➕ Add a session", b"add_session")]
     len_buttons = len(buttons)
-    buttons = arrange_buttons(buttons, per_page)
-    return buttons[page - 1], len(buttons) > page, len_buttons // per_page
+    pages = arrange_buttons(buttons, per_page)
+    if not pages or page > len(pages):
+        return [], False, 1
+    return pages[page - 1], len(pages) > page, len(pages)
 
 
-@Altruix.bot.on_message(
-    filters.command("settings", "/") & filters.user(Altruix.auth_users)
-)
+@Altruix.bot.on_message(filters.command("settings", "/"))
 @log_errors
-async def settings_command_handler(c: Client, m: Message):
-    await m.reply(
-        Altruix.get_string("SETTINGS_TEXT") or "<b>Settings</b>",
-        reply_markup=InlineKeyboardMarkup(settings_menu_buttons),
-        quote=True,
-    )
+async def settings_command_handler(c, m):
+    if m.sender_id not in Altruix.auth_users:
+        return
+    text = Altruix.get_string("SETTINGS_TEXT") or "<b>Settings</b>"
+    await m.reply(text, buttons=settings_menu_buttons, parse_mode="html")
 
 
-@Altruix.bot.on_callback_query(filters.regex("sessions_list_(\\d+)$"))
+@Altruix.bot.on_callback_query(filters.regex(r"sessions_list_(\d+)$"))
 @log_errors
-async def sessions_menu_cb_handler(c: Client, cb: CallbackQuery):
+async def sessions_menu_cb_handler(c, cb):
     await cb.answer()
-    page = int(cb.data.split("_")[-1])
+    match = re.search(r"sessions_list_(\d+)$", cb.data.decode("utf-8") if isinstance(cb.data, bytes) else str(cb.data))
+    page = int(match.group(1)) if match else 1
     buttons, has_next, total_pages = get_sessions_buttons(page)
-    buttons = arrange_buttons(buttons, 3)
+    grid = arrange_buttons(buttons, 3)
     last_col = []
-    if not page == 1:
-        last_col.append(InlineKeyboardButton("Previous", f"sessions_list_{page - 1}"))
-    last_col.append(
-        InlineKeyboardButton(f"🔙 [{page}/{total_pages or 1}]", "settings_menu")
-    )
+    if page > 1:
+        last_col.append(custom.Button.inline("Previous", f"sessions_list_{page - 1}".encode("utf-8")))
+    last_col.append(custom.Button.inline(f"🔙 [{page}/{total_pages or 1}]", b"settings_menu"))
     if has_next:
-        last_col.append(InlineKeyboardButton("Next", f"sessions_list_{page + 1}"))
-    await cb.message.edit(
-        text="Sessions", reply_markup=InlineKeyboardMarkup(buttons + [last_col])
-    )
+        last_col.append(custom.Button.inline("Next", f"sessions_list_{page + 1}".encode("utf-8")))
+    grid.append(last_col)
+    await cb.edit("Sessions", buttons=grid)
 
 
-@Altruix.bot.on_callback_query(filters.regex("session_info_(\\d+)_(\\d+)$"))
+@Altruix.bot.on_callback_query(filters.regex(r"session_info_(\d+)_(\d+)$"))
 @log_errors
-async def sessions_info_cb_handler(c: Client, cb: CallbackQuery):
+async def sessions_info_cb_handler(c, cb):
     await cb.answer()
-    index = int(cb.matches[0].group(1))
-    callback_page = int(cb.matches[0].group(1))
+    data_str = cb.data.decode("utf-8") if isinstance(cb.data, bytes) else str(cb.data)
+    match = re.search(r"session_info_(\d+)_(\d+)$", data_str)
+    if not match:
+        return
+    index = int(match.group(1))
+    page = int(match.group(2))
+    if index >= len(Altruix.clients):
+        await cb.answer("Session no longer available.", alert=True)
+        return
     session_info = Altruix.clients[index].myself
-    txt = "<b>Session info</b>\n\n<b>First name:</b> {}\n<b>Last name:</b> {}\n<b>DC ID:</b> <code>{}</code>\n<b>Username:</b> @{}\n<b>Is SCAM:</b> <code>{}</code>".format(
-        session_info.first_name,
-        session_info.last_name,
-        session_info.dc_id,
-        session_info.username,
-        session_info.is_scam,
+    txt = (
+        f"<b>Session info</b>\n\n"
+        f"<b>First name:</b> {getattr(session_info, 'first_name', '')}\n"
+        f"<b>Last name:</b> {getattr(session_info, 'last_name', '')}\n"
+        f"<b>Username:</b> @{getattr(session_info, 'username', 'None')}\n"
+        f"<b>Is Bot:</b> <code>{getattr(session_info, 'bot', False)}</code>\n"
+        f"<b>Is SCAM:</b> <code>{getattr(session_info, 'scam', False)}</code>"
     )
-    await cb.message.edit(
-        text=txt,
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "🔄 Refresh data", f"refresh_session_info_{index}"
-                    ),
-                    InlineKeyboardButton(
-                        "🔗 Unlink (Remove)", f"unlink_session_{index}"
-                    ),
-                ],
-                [
-                    InlineKeyboardButton("🔙 Back", f"sessions_list_{callback_page+1}"),
-                ],
-            ]
-        ),
-    )
+    bttns = [
+        [
+            custom.Button.inline("🔄 Refresh data", f"refresh_session_info_{index}".encode("utf-8")),
+            custom.Button.inline("🔗 Unlink (Remove)", f"unlink_session_{index}".encode("utf-8")),
+        ],
+        [
+            custom.Button.inline("🔙 Back", f"sessions_list_{page}".encode("utf-8")),
+        ],
+    ]
+    await cb.edit(txt, buttons=bttns, parse_mode="html")
 
 
-@Altruix.bot.on_callback_query(filters.regex("refresh_session_info_(\\d+)$"))
+@Altruix.bot.on_callback_query(filters.regex(r"refresh_session_info_(\d+)$"))
 @log_errors
-async def refresh_session_info_cb_handler(c: Client, cb: CallbackQuery):
-    index = int(cb.matches[0].group(1))
-    Altruix.ourselves[index] = await Altruix.clients[index].get_me()
-    await cb.answer("Data refreshed!")
-    await sessions_info_cb_handler(c, cb)
+async def refresh_session_info_cb_handler(c, cb):
+    data_str = cb.data.decode("utf-8") if isinstance(cb.data, bytes) else str(cb.data)
+    match = re.search(r"refresh_session_info_(\d+)$", data_str)
+    if match:
+        index = int(match.group(1))
+        if index < len(Altruix.clients):
+            Altruix.clients[index].myself = await Altruix.clients[index].get_me()
+    await cb.answer("Data refreshed!", alert=True)
 
 
-@Altruix.bot.on_callback_query(filters.regex("unlink_session_(\\d+)$"))
+@Altruix.bot.on_callback_query(filters.regex(r"unlink_session_(\d+)$"))
 @log_errors
-async def unlink_session_cb_handler(c: Client, cb: CallbackQuery):
-    temp = await cb.message.reply(
-        "Are you sure you want to unlink this session?",
-        quote=True,
-        reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton("Yeah sure")]],
-            resize_keyboard=True,
-            one_time_keyboard=True,
-        ),
-    )
-    confirmation = await cb.from_user.listen(filters.text, timeout=600)
-    await Altruix.bot.delete_messages(temp.chat.id, (temp.id, confirmation.id))
-    temp = await temp.reply("Processing..", ReplyKeyboardRemove())
-    await cb.answer("The session will be removed and restarted soon.", show_alert=True)
-    await temp.delete()
-    await Altruix.remove_session(int(cb.matches[0].group(1)))
-    cb.data = "sessions_list_1"
-    await sessions_menu_cb_handler(c, cb)
+async def unlink_session_cb_handler(c, cb):
+    data_str = cb.data.decode("utf-8") if isinstance(cb.data, bytes) else str(cb.data)
+    match = re.search(r"unlink_session_(\d+)$", data_str)
+    if not match:
+        return
+    index = int(match.group(1))
+    if index >= len(Altruix.clients):
+        await cb.answer("Session already removed or not found.", alert=True)
+        return
+
+    client_to_remove = Altruix.clients.pop(index)
+    with suppress_error(msg="Disconnecting removed client session"):
+        await client_to_remove.disconnect()
+
+    Altruix.config.pop_session(index)
+    await cb.answer("Session unlinked and removed successfully!", alert=True)
+
+    # Return to sessions menu
+    buttons, _, total_pages = get_sessions_buttons(1)
+    grid = arrange_buttons(buttons, 3)
+    grid.append([custom.Button.inline("🔙 [1/1]", b"settings_menu")])
+    await cb.edit("Sessions", buttons=grid)

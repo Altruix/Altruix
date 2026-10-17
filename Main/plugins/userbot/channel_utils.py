@@ -6,29 +6,29 @@
 #
 # All rights reserved.
 
-
 import random
 import asyncio
 import logging
+import contextlib
 from Main import Altruix
-from typing import Union
+from Main.utils.suppress import suppress_error
+from typing import Union, Any
 from Main.core.config import Config
-from pyrogram import Client, filters
-from pyrogram.types import Chat, Message
-from ...core.types.message import Message as MMessage
-from pyrogram.errors.exceptions.forbidden_403 import ChatAdminRequired
-from pyrogram.errors.exceptions.bad_request_400 import (
-    PeerIdInvalid, UsernameInvalid)
+from Main.core.types.client import AltruixTelegramClient as Client
+from Main.core.types.message import Message
+from telethon import errors
 
 
-auto_post_db = Altruix.db.make_collection("auto_post_s")
-auto_post_cache = Config.AUTOPOST_CACHE
+logger = logging.getLogger("altruix.channel_utils")
 
 
-def digit_wrap(digit_: str) -> Union[str, int]:
+def digit_wrap(digit_: Any) -> Union[str, int]:
     try:
-        return int(digit_)
-    except ValueError:
+        val = str(digit_).strip()
+        if val.lstrip("-").isdigit():
+            return int(val)
+        return digit_
+    except Exception:
         return digit_
 
 
@@ -36,12 +36,12 @@ def digit_wrap(digit_: str) -> Union[str, int]:
     "transfer",
     cmd_help={
         "help": "Transfer channel contents from one to another",
-        "example": "transfer @warner_stark @tenet",
+        "example": "transfer @source_channel @target_channel",
     },
     requires_input=True,
 )
-async def fast_transfer(c: Client, m: Union[Message, MMessage]):
-    _m: Message = await m.handle_message("PROCESSING")
+async def fast_transfer(c: Client, m: Message):
+    _m = await m.handle_message("PROCESSING")
     input_ = m.user_input.strip().split(" ", 1)
     if len(input_) == 1:
         transfer_to = digit_wrap(m.chat.id)
@@ -52,49 +52,36 @@ async def fast_transfer(c: Client, m: Union[Message, MMessage]):
     _args_m = m.user_args
     if from_transfer == transfer_to:
         return await _m.edit_msg("ILLEGAL_TRANSFER")
+
     count_of_ss = 0
     try:
-        async for message_ in c.get_chat_history(from_transfer):
-            if message_.service:
+        async for message_ in c.iter_messages(from_transfer):
+            if not message_ or getattr(message_, "action", None):
                 continue
             if "-onlyimg" in _args_m and not message_.photo:
                 continue
             if "-onlyvid" in _args_m and not message_.video:
                 continue
-            if "-onlyaud" in _args_m and not message_.audio:
-                continue
             if "-onlydoc" in _args_m and not message_.document:
                 continue
             if "-onlytxt" in _args_m and not message_.text:
                 continue
-            if "-onlygif" in _args_m and not message_.animation:
-                continue
-            if "-onlysticker" in _args_m and not message_.sticker:
-                continue
-            if "-onlyvoice" in _args_m and not message_.voice:
-                continue
-            if "-onlycontact" in _args_m and not message_.contact:
-                continue
             try:
-                await message_.copy(transfer_to)
-                await asyncio.sleep(random.randint(1, 3))
+                await c.send_message(transfer_to, message_)
+                await asyncio.sleep(random.uniform(0.5, 1.5))
                 count_of_ss += 1
-            except ChatAdminRequired:
+            except errors.ChatAdminRequiredError:
                 return await _m.edit_msg("CHAT_ADMIN_REQUIRED")
-            except UsernameInvalid:
-                return await _m.edit_msg("INVALID_CHAT_ID")
-            except PeerIdInvalid:
+            except (errors.UsernameInvalidError, errors.PeerIdInvalidError):
                 return await _m.edit_msg("INVALID_CHAT_ID")
             except Exception as e:
-                try:
-                    await _m.edit_msg(f"<code>{message_.id}</code>: <code>{e}</code>")
-                except Exception:
-                    logging.error(e)
+                logger.error(f"Error copying message {message_.id}: {e}")
                 continue
     except Exception as e:
-        return await _m.edit_msg("FAILED_TRANSFER", string_args=(str(e)))
+        return await _m.edit_msg("FAILED_TRANSFER", string_args=(str(e),))
+
     await _m.edit_msg(
-        "TRANSFER_SUCCESS", string_args=(from_transfer, transfer_to, count_of_ss)
+        "TRANSFER_SUCCESS", string_args=(str(from_transfer), str(transfer_to), count_of_ss)
     )
 
 
@@ -106,85 +93,56 @@ async def fast_transfer(c: Client, m: Union[Message, MMessage]):
     },
     requires_input=True,
 )
-async def add_autopost_func(c: Client, m: Union[Message, MMessage]):
+async def add_autopost_func(c: Client, m: Message):
     msg_ = await m.handle_message("PROCESSING")
-    if m.chat.type == "private":
+    if getattr(m, "is_private", False) or getattr(m.chat, "type", "") == "private":
         return await m.edit_msg("INVALID_CHAT_ID")
     chat_ = digit_wrap(m.user_input)
     try:
-        chat_obj: Chat = await c.get_group(chat_)
+        chat_obj = await c.get_entity(chat_)
     except Exception:
-        return await msg_.edit_msg("AUTOPOST_FAILED_CINVALID", string_args=(chat_))
-    if chat_obj.type == "private":
-        return await m.edit_msg("INVALID_CHAT_ID")
+        return await msg_.edit_msg("AUTOPOST_FAILED_CINVALID", string_args=(str(chat_),))
+
+    if Altruix.db is None:
+        return await msg_.edit_msg("No database connected.")
+
+    auto_post_db = Altruix.db.make_collection("auto_post_s")
+    target_id = getattr(chat_obj, "id", chat_)
+    curr_chat_id = m.chat_id or getattr(m.chat, "id", None)
     if await auto_post_db.find_one(
-        {"client_id": c.myself.id, "from_chat": m.chat.id, "to_chat": chat_obj.id}
+        {"client_id": c.myself.id, "from_chat": curr_chat_id, "to_chat": target_id}
     ):
         return await msg_.edit_msg("ALREADY_AUTOPOST")
+
     await auto_post_db.insert_one(
-        {"client_id": c.myself.id, "from_chat": m.chat.id, "to_chat": chat_obj.id}
+        {"client_id": c.myself.id, "from_chat": curr_chat_id, "to_chat": target_id}
     )
-    if c.myself.id not in auto_post_cache:
-        auto_post_cache[c.myself.id] = {}
-    if auto_post_cache[c.myself.id].get(m.chat.id):
-        auto_post_cache[c.myself.id][m.chat.id].append(chat_obj.id)
+    if c.myself.id not in Config.AUTOPOST_CACHE:
+        Config.AUTOPOST_CACHE[c.myself.id] = {}
+    if Config.AUTOPOST_CACHE[c.myself.id].get(curr_chat_id):
+        Config.AUTOPOST_CACHE[c.myself.id][curr_chat_id].append(target_id)
     else:
-        auto_post_cache[c.myself.id][m.chat.id] = [chat_obj.id]
+        Config.AUTOPOST_CACHE[c.myself.id][curr_chat_id] = [target_id]
     await msg_.edit_msg("AUTOPOST_ADDED")
 
 
 @Altruix.register_on_cmd(
     "rm_autopost",
     cmd_help={
-        "help": "removes an auto post to the database!",
+        "help": "Removes an auto post from the database!",
         "example": "rm_autopost -100xxxx",
     },
     requires_input=True,
 )
-async def rm_autopost_func(c: Client, m: Union[Message, MMessage]):
+async def rm_autopost_func(c: Client, m: Message):
     msg_ = await m.handle_message("PROCESSING")
-    if m.chat.type == "private":
-        return await m.edit_msg("INVALID_CHAT_ID")
-    chat_ = m.user_input
-    try:
-        chat_obj = await c.get_group(chat_)
-    except Exception:
-        return await msg_.edit_msg("AUTOPOST_FAILED_CINVALID", string_args=(chat_))
-    if not (
-        await auto_post_db.find_one(
-            {"client_id": c.myself.id, "from_chat": m.chat.id, "to_chat": chat_obj.id}
-        )
-    ):
-        return await msg_.edit_msg("NOT_IN_AUTOPOST")
-    await auto_post_db.delete_one(
-        {"client_id": c.myself.id, "from_chat": m.chat.id, "to_chat": chat_obj.id}
-    )
-    if (
-        auto_post_cache.get(c.myself.id)
-        and auto_post_cache.get(c.myself.id).get(m.chat.id)
-        and chat_obj.id in auto_post_cache.get(c.myself.id).get(m.chat.id)
-    ):
-        auto_post_cache[c.myself.id][m.chat.id].remove(chat_obj.id)
+    chat_ = digit_wrap(m.user_input)
+    if Altruix.db is None:
+        return await msg_.edit_msg("No database connected.")
+    curr_chat_id = m.chat_id or getattr(m.chat, "id", None)
+    auto_post_db = Altruix.db.make_collection("auto_post_s")
+    await auto_post_db.delete_one({"client_id": c.myself.id, "from_chat": curr_chat_id, "to_chat": chat_})
+    if c.myself.id in Config.AUTOPOST_CACHE and curr_chat_id in Config.AUTOPOST_CACHE[c.myself.id]:
+        with suppress_error(ValueError, msg="Removing chat from AUTOPOST_CACHE"):
+            Config.AUTOPOST_CACHE[c.myself.id][curr_chat_id].remove(chat_)
     await msg_.edit_msg("AUTOPOST_REMOVED")
-
-
-@Altruix.on_message(~filters.private & ~filters.via_bot, 5)
-async def auto_poster(c, m: Union[Message, MMessage]):
-    if not auto_post_cache.get(c.myself.id) or not auto_post_cache.get(c.myself.id).get(
-        m.chat.id
-    ):
-        return
-    for chat in auto_post_cache.get(c.myself.id).get(m.chat.id):
-        try:
-            await m.copy(chat)
-        except ChatAdminRequired:
-            logging.critical(
-                f"You are not an admin for {chat}. removing chat from database to avoid mass errors."
-            )
-            await auto_post_db.delete_one(
-                {"client_id": c.myself.id, "from_chat": m.chat.id, "to_chat": chat}
-            )
-            auto_post_cache[c.myself.id][m.chat.id].remove(chat)
-        except Exception:
-            Altruix.log()
-        continue

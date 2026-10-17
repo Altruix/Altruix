@@ -6,88 +6,61 @@
 #
 # All rights reserved.
 
-
 import time
 from Main import Altruix
 from style import ping_format as pf
-from pyrogram import Client, filters
-from pyrogram.raw.functions import Ping
+from Main.utils.custom_filters import filters
 from Main.utils.essentials import Essentials
 from Main.core.decorators import log_errors, iuser_check
-from pyrogram.types import (
-    Message, InlineQuery, CallbackQuery, InlineKeyboardButton,
-    InlineKeyboardMarkup, InputTextMessageContent, InlineQueryResultArticle)
+from telethon import custom
 
 
-@Altruix.bot.on_message(
-    filters.command("ping", "/") & filters.user(Altruix.config.OWNER_ID)
-)
+@Altruix.bot.on_message(filters.command("ping", "/"))
 @log_errors
-async def restart_command_handler(c: Client, m: Message):
+async def ping_command_handler(c, m):
+    if m.sender_id != Altruix.config.OWNER_ID:
+        return
     start = time.perf_counter()
-    await c.invoke(Ping(ping_id=9999999))
+    await c.get_me()
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
     end = time.perf_counter()
     ms = round((end - start) * 1000, 2)
-    await m.edit(
-        Altruix.get_string("PING_TEXT").format(
-            pf["ping_emoji1"], ms, pf["ping_emoji2"], uptime
-        ),
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton(f"{pf['ping_emoji1']} Ping", "ping")]]
-        ),
-    )
+    template = Altruix.get_string("PING_TEXT") or "{0} Pong! {1} ms | {2} Uptime: {3}"
+    text = template.format(pf["ping_emoji1"], ms, pf["ping_emoji2"], uptime)
+    buttons = [[custom.Button.inline(f"{pf['ping_emoji1']} Ping", b"ping")]]
+    await m.reply(text, buttons=buttons, parse_mode="html")
 
 
-@Altruix.bot.on_callback_query(filters.regex("^ping"))
+@Altruix.bot.on_callback_query(filters.regex(r"^ping"))
 @log_errors
-async def ping_cb_handler(c: Client, cb: CallbackQuery):
+async def ping_cb_handler(c, cb):
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
     start = time.perf_counter()
-    await c.invoke(Ping(ping_id=9999999))
+    await c.get_me()
     end = time.perf_counter()
     ms = round((end - start) * 1000, 2)
-    text = Altruix.get_string("PING_TEXT").format(
-        pf["ping_emoji1"], ms, pf["ping_emoji2"], uptime
-    )
-    await cb.answer(Essentials.clean_html(text), show_alert=True)
-    await cb.edit_message_text(
-        Altruix.get_string(
-            "PING_TEXT", args=(pf["ping_emoji1"], ms, pf["ping_emoji2"], uptime)
-        ),
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton(f"{pf['ping_emoji1']} Ping", "ping")]]
-        ),
-    )
+    template = Altruix.get_string("PING_TEXT") or "{0} Pong! {1} ms | {2} Uptime: {3}"
+    text = template.format(pf["ping_emoji1"], ms, pf["ping_emoji2"], uptime)
+    await cb.answer(Essentials.clean_html(text), alert=True)
+    buttons = [[custom.Button.inline(f"{pf['ping_emoji1']} Ping", b"ping")]]
+    await cb.edit(text, buttons=buttons, parse_mode="html")
 
 
-@Altruix.bot.on_inline_query(filters.regex("^ping"))
+@Altruix.bot.on_inline_query(filters.regex(r"^ping"))
 @log_errors
 @iuser_check
-async def ping_inline_handler(c: Client, iq: InlineQuery):
+async def ping_inline_handler(c, iq):
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
     start = time.perf_counter()
-    await c.invoke(Ping(ping_id=9999999))
+    await c.get_me()
     end = time.perf_counter()
     ms = round((end - start) * 1000, 2)
-    await iq.answer(
-        [
-            InlineQueryResultArticle(
-                id=1,
-                title=f"{pf['ping_emoji1']} Pong!",
-                description=f"{ms} ms\n{uptime}",
-                input_message_content=InputTextMessageContent(
-                    "<b>{} Pong!</b>\n<code>{} ms</code>\n<b>{} Uptime:</b> <code>{}</code>".format(
-                        pf["ping_emoji1"], ms, pf["ping_emoji2"], uptime
-                    )
-                ),
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton(f"{pf['ping_emoji1']} Ping", "ping")]]
-                ),
-            )
-        ],
-        cache_time=0,
-        is_personal=True,
-        switch_pm_text=f"{pf['ping_emoji1']} Ping",
-        switch_pm_parameter="ping",
+    builder = iq.builder
+    result = builder.article(
+        title=f"{pf['ping_emoji1']} Pong!",
+        description=f"{ms} ms\n{uptime}",
+        text=f"<b>{pf['ping_emoji1']} Pong!</b>\n<code>{ms} ms</code>\n<b>{pf['ping_emoji2']} Uptime:</b> <code>{uptime}</code>",
+        parse_mode="html",
+        buttons=[[custom.Button.inline(f"{pf['ping_emoji1']} Ping", b"ping")]],
     )
+    await iq.answer([result])

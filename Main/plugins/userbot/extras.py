@@ -15,10 +15,11 @@ import socket
 import platform
 import contextlib
 from Main import Altruix
+from Main.utils.suppress import suppress_error
 from os import remove as rmv
 from mimetypes import guess_type
 from Main.utils.paste import Paste
-from pyrogram.types import Message
+from Main.core.types import Message, AltruixTelegramClient
 from Main.utils.essentials import Essentials
 
 
@@ -54,9 +55,9 @@ def get_info(value=False) -> tuple:
     hostname = socket.gethostname()
     ip_address = "Unable to fetch"
     mac_address = "Unable to fetch"
-    with contextlib.suppress(Exception):
+    with suppress_error(msg="Fetching host ip"):
         ip_address = socket.gethostbyname(socket.gethostname())
-    with contextlib.suppress(Exception):
+    with suppress_error(msg="Fetching mac address"):
         mac_address = ":".join(re.findall("..", "%012x" % uuid.getnode()))
     processor = platform.processor()
     ram = Essentials.humanbytes(round(psutil.virtual_memory().total))
@@ -102,7 +103,7 @@ def get_info(value=False) -> tuple:
         ],
     },
 )
-async def sTATS(c: Altruix, m: Message):
+async def sTATS(c: AltruixTelegramClient, m: Message):
     msg = await m.handle_message("PROCESSING")
     value = m.user_args and m.user_args.a
     ub_stat = await get_info(value)
@@ -125,19 +126,25 @@ async def sTATS(c: Altruix, m: Message):
     },
     requires_reply=True,
 )
-async def file_to_b64(c: Altruix, m: Message):
+async def file_to_b64(c: AltruixTelegramClient, m: Message):
     msg = await m.handle_message("PROCESSING")
-    if not msg.reply_to_message.media:
-        return msg.edit("Reply to media...")
-    file = await msg.reply_to_message.download()
-    base = fileToBase64(file)
-    type = guess_type(file)[0]
-    name, link = await Paste(f"data:{type};base64,{str(base)[2:][:-1]}").paste()
-    await msg.edit(
-        Altruix.get_string("PASTE_TEXT").format(link, name),
-        disable_web_page_preview=True,
-    )
-    rmv(file)
+    reply = await m.get_reply_message()
+    if not reply or not reply.media:
+        return await msg.edit("Reply to media...")
+    temp_dir = os.path.abspath("./temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    file = await reply.download_media(file=temp_dir)
+    try:
+        base = fileToBase64(file)
+        type_ = guess_type(file)[0]
+        name, link = await Paste(f"data:{type_};base64,{str(base)[2:][:-1]}").paste()
+        await msg.edit(
+            Altruix.get_string("PASTE_TEXT").format(link, name),
+            link_preview=False,
+        )
+    finally:
+        if file and os.path.exists(file):
+            rmv(file)
 
 
 # @Altruix.register_on_cmd(

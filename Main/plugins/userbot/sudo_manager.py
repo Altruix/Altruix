@@ -12,30 +12,34 @@ A-Z for sudo users!
 
 from Main import Altruix
 from style import bullets
-from pyrogram import Client
-from ...core.types.message import Message
+from Main.core.types.client import AltruixTelegramClient as Client
+from Main.core.types.message import Message
 
 
-b4 = bullets["bullet4"]
-b5 = bullets["bullet5"]
-b6 = bullets["bullet6"]
-b7 = bullets["bullet7"]
+b4 = bullets.get("bullet4", "•")
+b5 = bullets.get("bullet5", "├")
+b6 = bullets.get("bullet6", "│")
+b7 = bullets.get("bullet7", "└")
 
 
 def bulletify(u_):
     out = "<b>Sudo Users :</b> \n"
     len_ = len(u_)
     if len_ == 1:
-        return f"{out}\n{b6}{b4} {u_[0].mention}"
+        mention = getattr(u_[0], "mention", str(u_[0].id))
+        return f"{out}\n{b6}{b4} {mention}"
     if len_ == 2:
-        return f"{out}\n{b5}{b4} {u_[0].mention}\n{b7}{b4} {u_[1].mention}"
+        m0 = getattr(u_[0], "mention", str(u_[0].id))
+        m1 = getattr(u_[1], "mention", str(u_[1].id))
+        return f"{out}\n{b5}{b4} {m0}\n{b7}{b4} {m1}"
     for i in enumerate(u_):
+        m_curr = getattr(i[1], "mention", str(i[1].id))
         if i[0] == 0:
-            out += f"\n{b5}{b4} {i[1].mention}"
+            out += f"\n{b5}{b4} {m_curr}"
         elif i[0] == len_ - 1:
-            out += f"\n{b7}{b4} {i[1].mention}"
+            out += f"\n{b7}{b4} {m_curr}"
         else:
-            out += f"\n{b6}{b4} {i[1].mention}"
+            out += f"\n{b6}{b4} {m_curr}"
     return out
 
 
@@ -48,30 +52,39 @@ async def disabled_ps_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     input_ = m.user_input.strip()
     if "," in input_:
-        input_ = input_.split(",").strip()
+        input_ = [x.strip() for x in input_.split(",") if x.strip()]
+    else:
+        input_ = [input_]
     await Altruix.config.sync_env_to_db("DISABLED_SUDO_CMD_LIST", input_, push_=True)
-    await msg.edit_msg("DISABLED_SUDO_CMD", string_args=(input_))
+    current = getattr(Altruix, "disabled_sudo_plugin_list", [])
+    Altruix.disabled_sudo_plugin_list = list(dict.fromkeys([*current, *[x.lower() for x in input_]]))
+    await msg.edit_msg("DISABLED_SUDO_CMD", string_args=(str(input_),))
 
 
 @Altruix.register_on_cmd(
     "rmdfs",
-    cmd_help={"help": "Disabled cmds from sudo users", "example": "dpfs eval"},
+    cmd_help={"help": "Disabled cmds from sudo users", "example": "rmdfs eval"},
     requires_input=True,
 )
 async def remove_disabled_ps_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     input_ = m.user_input.strip()
     if "," in input_:
-        input_ = input_.split(",")
-    await Altruix.config.unsync_env_to_db("DISABLED_SUDO_CMD_LIST", input_)
-    await msg.edit_msg("UNDISABLED_SUDO_CMD", string_args=(input_))
+        input_ = [x.strip() for x in input_.split(",") if x.strip()]
+    else:
+        input_ = [input_]
+    Altruix.disabled_sudo_plugin_list = await Altruix.config.unsync_env_to_db(
+        "DISABLED_SUDO_CMD_LIST", input_
+    )
+    Altruix.disabled_sudo_plugin_list = [str(item).strip().lower() for item in Altruix.disabled_sudo_plugin_list]
+    await msg.edit_msg("UNDISABLED_SUDO_CMD", string_args=(str(input_),))
 
 
 @Altruix.register_on_cmd(
     "addsudo",
     cmd_help={
-        "help": "Add a user to sudo list, requires restart once done!",
-        "example": "addsudo @warner_stark",
+        "help": "Add a user to sudo list",
+        "example": "addsudo @username",
     },
 )
 async def add_sudo_func(c: Client, m: Message):
@@ -79,21 +92,31 @@ async def add_sudo_func(c: Client, m: Message):
     user, _, is_channel = m.get_user
     if not user or is_channel:
         return await msg.edit_msg("INVALID_USER")
+    target_id = None
+    mention_str = None
     try:
-        user_id = await c.get_users(user)
+        user_ent = await c.get_users(user)
+        target_id = user_ent.id
+        mention_str = getattr(user_ent, "mention", str(target_id))
     except Exception:
-        return await msg.edit_msg("INVALID_USER")
-    if user_id.id in (await Altruix.config.get_sudo()):
+        if isinstance(user, int):
+            target_id = user
+            mention_str = str(user)
+        else:
+            return await msg.edit_msg("INVALID_USER")
+
+    sudo_list = await Altruix.config.get_sudo()
+    if target_id in sudo_list:
         return await msg.edit_msg("ALREADY_IN_SUDO")
-    await Altruix.config.add_sudo(user_id.id)
-    await msg.edit_msg("ADDED_SUDO", string_args=(user_id.mention))
+    await Altruix.config.add_sudo(target_id)
+    await msg.edit_msg("ADDED_SUDO", string_args=(mention_str,))
 
 
 @Altruix.register_on_cmd(
     "rmsudo",
     cmd_help={
-        "help": "remove sudo from sudo list, requires a restart to reflect the changes",
-        "example": "rmsudo @warner_stark",
+        "help": "Remove sudo from sudo list",
+        "example": "rmsudo @username",
         "user_args": [
             {
                 "arg": "a",
@@ -107,33 +130,44 @@ async def rm_sudo_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     user, _, is_channel = m.get_user
     acg = await Altruix.config.get_sudo()
-    if user_args := m.user_args:
-        if "a" in user_args:
-            count = 0
-            lacg = len(acg)
-            for i in acg:
-                try:
-                    await Altruix.config.del_sudo(i)
-                    count += 1
-                except BaseException:
-                    pass
-            return await msg.edit_msg("DEL_SUDO_A", string_args=(count, lacg))
+    user_args = m.user_args
+    if "a" in user_args:
+        count = 0
+        lacg = len(acg)
+        for i in acg:
+            try:
+                await Altruix.config.del_sudo(i)
+                count += 1
+            except Exception:
+                pass
+        return await msg.edit_msg("DEL_SUDO_A", string_args=(count, lacg))
+
     if not user or is_channel:
         return await msg.edit_msg("INVALID_USER")
+
+    target_id = None
+    mention_str = None
     try:
-        user_id = await c.get_users(user)
+        user_ent = await c.get_users(user)
+        target_id = user_ent.id
+        mention_str = getattr(user_ent, "mention", str(target_id))
     except Exception:
-        return await msg.edit_msg("INVALID_USER")
-    if user_id.id not in acg:
+        if isinstance(user, int):
+            target_id = user
+            mention_str = str(user)
+        else:
+            return await msg.edit_msg("INVALID_USER")
+
+    if target_id not in acg:
         return await msg.edit_msg("NOT_IN_SUDO")
-    await Altruix.config.del_sudo(user_id.id)
-    await msg.edit_msg("DEL_SUDO", string_args=(user_id.mention))
+    await Altruix.config.del_sudo(target_id)
+    await msg.edit_msg("DEL_SUDO", string_args=(mention_str,))
 
 
 @Altruix.register_on_cmd(
     "listsudo", cmd_help={"help": "list all sudo users!", "example": "listsudo"}
 )
-async def add_sudo_func(c: Client, m: Message):
+async def list_sudo_func(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     users_ = await Altruix.config.get_sudo()
     if not users_:
@@ -143,7 +177,7 @@ async def add_sudo_func(c: Client, m: Message):
         try:
             user_.append(await c.get_users(int(i)))
         except Exception:
-            continue
+            user_.append(type("DummyUser", (), {"id": int(i), "mention": f"<code>{i}</code>"}))
     if not user_:
         return await msg.edit_msg("NO_SUDO_LIST")
 

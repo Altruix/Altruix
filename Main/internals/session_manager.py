@@ -6,26 +6,26 @@
 #
 # All rights reserved.
 
-
 from Main import Altruix
-from pyrogram import filters
+from Main.utils.custom_filters import filters
 from Main.core.decorators import log_errors
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from telethon import custom
 
 
-@Altruix.bot.on_message(filters.command("add", "/") & filters.user(Altruix.auth_users))
+@Altruix.bot.on_message(filters.command("add", "/"))
 @log_errors
-async def add_session_command_handler(_, m: Message):
-    if m.from_user.id not in Altruix.auth_users:
-        return await m.reply_text("Hey, I'm just a bot. Powered by @AltruixUB.")
+async def add_session_command_handler(_, m):
+    sender_id = getattr(m, "sender_id", None)
+    if sender_id not in Altruix.auth_users:
+        return await m.reply("Hey, I'm just a bot. Powered by @AltruixUB.")
+
+    buttons = [
+        [
+            custom.Button.inline("Yes", b"session_yes"),
+            custom.Button.inline("No", b"session_no"),
+        ]
+    ]
     await m.reply(
-        "Do you have the string session already generated?.",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Yes", callback_data="session_yes"),
-                    InlineKeyboardButton("No", callback_data="session_no"),
-                ]
-            ]
-        ),
+        "Do you have the Telethon string session already generated?",
+        buttons=buttons,
     )

@@ -6,8 +6,7 @@
 #
 # All rights reserved.
 
-from Main import Altruix
-
-
 if __name__ == "__main__":
-    Altruix.test_run()
+    import pytest
+
+    raise SystemExit(pytest.main())

@@ -6,124 +6,136 @@
 #
 # All rights reserved.
 
+from __future__ import annotations
+
+import logging
 import traceback
-from Main import Altruix
-from typing import Union
+import contextlib
 from functools import wraps
-from Main.internals.set_inline import set_inline_in_botfather
-from pyrogram.types import Message, InlineQuery, CallbackQuery
-from pyrogram import Client, StopPropagation, ContinuePropagation
-from pyrogram.errors import (
-    MessageEmpty, MessageIdInvalid, BotInlineDisabled, MessageNotModified,
-    UserNotParticipant)
+from typing import Any, Callable, List, Union
+
+from telethon import errors, events
+from telethon.events import StopPropagation
+
+logger = logging.getLogger("altruix.decorators")
 
 
-def inline_check(func):
+def inline_check(func: Callable) -> Callable:
     @wraps(func)
-    async def check_inline(c: Client, m: Message, *args, **kwargs):
+    async def wrapper(c: Any, m: Any, *args, **kwargs) -> Any:
         try:
-            return await func(c, m)
-        except BotInlineDisabled:
+            return await func(c, m, *args, **kwargs)
+        except (errors.ChatSendInlineForbiddenError, errors.BotInlineDisabledError):
+            from Main.internals.set_inline import set_inline_in_botfather
             status = await m.handle_message("INLINE_DISABLED")
             await set_inline_in_botfather(c)
-            await status.delete()
-            return await func(c, m)
-
-    return check_inline
-
-
-def check_perm(perm_type, return_perm=False):
-    def check_perm_s(func):
-        async def perm_check(client, m):
-            if m.chat.type in ["bot", "private"]:
-                return await func(client, m)
-            if isinstance(perm_type, list):
-                s = {}
-                for i in perm_type:
-                    s[perm_type] = await client.check_my_perm(m, i)[0]
-                if all(element is False for element in s.values()):
-                    return await func(client, m)
-                not_true_ = [str(v) for v in s.values() if v is False]
-                not_true_m = "".join(f"{i} " for i in not_true_)
-                return await m.handle_message(
-                    "ADMIN_ACTION_FAILED", string_args=(not_true_m)
-                )
-            else:
-                perm_result = await client.check_my_perm(m, perm_type)
-                if return_perm:
-                    return (
-                        await func(client, m, perm_result[1])
-                        if perm_result[0]
-                        else await m.handle_message(
-                            "ADMIN_ACTION_FAILED", string_args=(perm_type)
-                        )
-                    )
-                return (
-                    await func(client, m)
-                    if perm_result[0]
-                    else await m.handle_message(
-                        "ADMIN_ACTION_FAILED", string_args=(perm_type)
-                    )
-                )
-
-        return perm_check
-
-    return check_perm_s
-
-
-def iuser_check(func):
-    """Allow only authorized users to send a callback query or inline query."""
-
-    async def wrapper(client, update: Union[CallbackQuery, InlineQuery]):
-        users = Altruix.auth_users
-        if update.from_user and update.from_user.id in users:
-            try:
-                return await func(client, update)
-            except MessageNotModified:
-                await update.answer("🤔🧐😳🙄😬🤭😶‍🌫️")
-        elif isinstance(update, CallbackQuery):
-            await update.answer(
-                "You are not authorized to use me.",
-                cache_time=0,
-                show_alert=True,
-            )
-        else:
-            await update.answer(
-                [],
-                cache_time=0,
-                is_personal=True,
-                switch_pm_text="You are not authorized to use me.",
-                switch_pm_parameter="auth",
-            )
+            if status:
+                with contextlib.suppress(Exception):
+                    await status.delete()
+            return await func(c, m, *args, **kwargs)
 
     return wrapper
 
 
-def log_errors(func):
-    """Log exceptions."""
+def check_perm(perm_type: Union[str, List[str]], return_perm: bool = False) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(client: Any, m: Any, *args, **kwargs) -> Any:
+            chat_type = getattr(m.chat, "type", "")
+            if chat_type in {"private", "bot"}:
+                return await func(client, m, *args, **kwargs)
+
+            if isinstance(perm_type, list):
+                perms_map = {}
+                for p in perm_type:
+                    has_perm, _ = await client.check_my_perm(m, p)
+                    perms_map[p] = has_perm
+                if all(val for val in perms_map.values()):
+                    return await func(client, m, *args, **kwargs)
+                failed_perms = " ".join([p for p, ok in perms_map.items() if not ok])
+                return await m.handle_message("ADMIN_ACTION_FAILED", string_args=(failed_perms,))
+            else:
+                has_perm, perm_dict = await client.check_my_perm(m, perm_type)
+                if has_perm:
+                    if return_perm:
+                        return await func(client, m, perm_dict, *args, **kwargs)
+                    return await func(client, m, *args, **kwargs)
+                return await m.handle_message("ADMIN_ACTION_FAILED", string_args=(perm_type,))
+
+        return wrapper
+
+    return decorator
+
+
+def iuser_check(func: Callable) -> Callable:
+    """Allow only authorized users to execute callback or inline query."""
 
     @wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(client: Any, update: Any, *args, **kwargs) -> Any:
+        import Main
+        users = Main.Altruix.auth_users
+        sender_id = getattr(update, "sender_id", None)
+        if sender_id is None and hasattr(update, "from_user") and update.from_user:
+            sender_id = getattr(update.from_user, "id", None)
+
+        if sender_id in users:
+            try:
+                return await func(client, update, *args, **kwargs)
+            except errors.MessageNotModifiedError:
+                if hasattr(update, "answer"):
+                    await update.answer("🤔🧐😳🙄😬")
+        elif isinstance(update, events.CallbackQuery.Event) or hasattr(update, "data"):
+            if hasattr(update, "answer"):
+                await update.answer(
+                    "You are not authorized to use me.",
+                    alert=True,
+                )
+        elif isinstance(update, events.InlineQuery.Event) or hasattr(update, "builder"):
+            if hasattr(update, "answer"):
+                await update.answer(
+                    [],
+                    cache_time=0,
+                    private=True,
+                    switch_pm="You are not authorized to use me.",
+                    switch_pm_param="auth",
+                )
+
+    return wrapper
+
+
+def log_errors(func: Callable) -> Callable:
+    """Log exceptions and report to log chat or owner."""
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs) -> Any:
         try:
             return await func(*args, **kwargs)
-        except StopPropagation as e:
-            raise StopPropagation from e
+        except StopPropagation:
+            raise
         except (
-            MessageNotModified,
-            MessageIdInvalid,
-            UserNotParticipant,
-            MessageEmpty,
+            errors.MessageNotModifiedError,
+            errors.MessageIdInvalidError,
+            errors.UserNotParticipantError,
+            errors.MessageEmptyError,
         ):
             pass
-        except ContinuePropagation as e:
-            raise ContinuePropagation from e
-        except Exception as _be:
-            try:
-                await Altruix.bot.send_message(
-                    Altruix.log_chat or Altruix.config.OWNER_ID,
-                    f"<b>AN ERROR OCCURRED:</b>\nException: <i>{_be}</i>\nOccurred in: <code>{func.__name__}</code>\n\n<code>{traceback.format_exc()}</code>",
-                )
-            except Exception as e:
-                raise _be from e
+        except Exception as exc:
+            import Main
+            altruix = Main.Altruix
+            tb = traceback.format_exc()
+            logger.error(f"Error in {func.__name__}: {exc}\n{tb}")
+            target_chat = altruix.log_chat or getattr(altruix.config, "OWNER_ID", None)
+            if target_chat and hasattr(altruix, "bot") and altruix.bot:
+                try:
+                    await altruix.bot.send_message(
+                        target_chat,
+                        f"<b>AN ERROR OCCURRED:</b>\n"
+                        f"Exception: <i>{exc}</i>\n"
+                        f"Occurred in: <code>{func.__name__}</code>\n\n"
+                        f"<pre>{tb}</pre>",
+                        parse_mode="html",
+                    )
+                except Exception:
+                    pass
 
     return wrapper

@@ -1,40 +1,47 @@
 <h1 align="center"><b>Altruix | UserBot</b></h1>
-<p align="center"><img src="https://telegra.ph/file/f51efe570b5f0a9165f8e.png"; width="1155px"><br></p>  
+<p align="center"><img src="https://telegra.ph/file/f51efe570b5f0a9165f8e.png"; width="1155px"><br></p>
 
-#### **Altruix** | A Modern yet simple UserBot which is based on Pyrogram. **Built By The Developers Of Friday Userbot.** 
+#### **Altruix** | A high-performance, modular Telegram UserBot and Assistant Bot framework built with **Telethon** and modern asynchronous Python.
 <br>
 
 # Deploying To Different Platforms
-> - For deploying [Locally](#Deploy-Locally)
+> - For deploying [Locally](#deploy-locally)
 
 <br>
 
 # Official Support/Updates
-> - Join the official **Updates** Channel  
->    <a href="https://t.me/AltruiXUB"><img src="https://img.shields.io/badge/Join-Altruix%20Channel-red.svg?logo=Telegram"></a>  
-> - Join the official **Support** Chat  
+> - Join the official **Updates** Channel
+>    <a href="https://t.me/AltruiXUB"><img src="https://img.shields.io/badge/Join-Altruix%20Channel-red.svg?logo=Telegram"></a>
+> - Join the official **Support** Chat
 >    <a href="https://t.me/AltruixChat"><img src="https://img.shields.io/badge/Join-Altruix%20Group-blue.svg?logo=telegram"></a>
 
 <br>
 
 ## Deploy Locally
 
-If you want to Deploy your Altruix UserBot on your PC or in Termux these are the steps -
+To deploy Altruix on your Linux server, PC, or Termux:
 
-> ```
-> git clone https://github.com/Altruix/Altruix
-> cd Altruix
-> nano .env
-> bash start.sh
-> ```
-
-Example of [`.env`](#env)
-
-<br>
+```bash
+git clone https://github.com/Altruix/Altruix
+cd Altruix
+cp example.env .env
+# Set API_ID and API_HASH in .env. Add BOT_TOKEN for the assistant bot,
+# and a StringSession in SESSIONS to enable userbot features.
+python -m pip install -e .
+python -m Main
+```
 
 ## String Session
 
-It's not necessary until you host the bot. You can get the String Session after you are done with hosting. Just run the Altruix Assistant bot and walk through the steps. 
+Altruix uses **Telethon StringSessions**. You can generate one in two ways:
+
+1. **Terminal Generator:**
+   ```bash
+   python -m Main.scripts.session_gen
+   ```
+2. **Interactive Assistant Bot:**
+   Run the assistant bot and use `/add` or `/session` to securely generate and register sessions directly through Telegram.
+
 
 ## Required Variables
 
@@ -78,7 +85,8 @@ It's not necessary until you host the bot. You can get the String Session after 
 
 <details close>
 
-  > TO BE DONE
+  > Optional. When left empty, Altruix stores settings in the local `local_db.json` file.
+  > Set `DB_URI` to a MongoDB connection string to use MongoDB, and optionally set `DB_NAME` (defaults to `Altruix`).
 
 <summary> DB_URI </summary>
 </details>
@@ -102,15 +110,96 @@ It's not necessary until you host the bot. You can get the String Session after 
 <summary> An example of how your `.env` file should look like: </summary>
 </details>
 
+## Altruix Package Manager (APM) & Custom Plugins
+
+> 📖 **Developer Guide:** For comprehensive instructions on creating plugins, decorators, database integration, and flags, check out the [Full Plugin Developer Guide](docs/PLUGIN_GUIDE.md).
+
+Altruix includes a built-in package manager (**APM**) that allows you to install, update, and manage third-party or custom plugins directly from GitHub repositories without modifying the core codebase.
+
+### Installing Plugins via APM
+
+You can install plugins directly through your Telegram client using the `.apm_install` command:
+
+* **Install from a GitHub Repository:**
+  ```text
+  .apm_install https://github.com/username/my-altruix-plugin
+  ```
+* **Install and persist across bot restarts:**
+  ```text
+  .apm_install -ios https://github.com/username/my-altruix-plugin
+  ```
+* **List installed external plugins:**
+  ```text
+  .apm_list
+  ```
+* **Uninstall a plugin:**
+  ```text
+  .apm_rem my-altruix-plugin
+  ```
+
+---
+
+### How to Create a Plugin Repository for APM
+
+To create your own plugin repository that can be installed by anyone using Altruix APM:
+
+#### 1. Repository Layout
+Create a public GitHub repository (e.g., `https://github.com/username/my-altruix-plugin`) with the following layout:
+
+```text
+my-altruix-plugin/
+├── plugin.json         # Plugin manifest (recommended)
+├── custom_tool.py      # Your plugin script
+└── README.md
+```
+
+#### 2. Plugin Manifest (`plugin.json`)
+Include a `plugin.json` in the root of your repository. APM reads this to verify metadata and automatically pip-install any required dependencies:
+
+```json
+{
+  "name": "my_custom_plugin",
+  "version": "1.0.0",
+  "description": "Custom utility commands for Altruix",
+  "author": "YourName",
+  "entry": "custom_tool.py",
+  "dependencies": ["httpx", "pillow"]
+}
+```
+
+* **`name`**: Unique identifier for your plugin.
+* **`entry`**: Specific `.py` entry file (if omitted, all `.py` files in the repository are loaded).
+* **`dependencies`**: Python packages that APM will automatically install before loading the plugin.
+
+#### 3. Writing Plugin Code
+Write your plugin using standard Altruix decorators:
+
+```python
+from Main import Altruix
+from Main.core.types.client import AltruixTelegramClient as Client
+from Main.core.types.message import Message
+
+@Altruix.register_on_cmd(
+    ["mycmd"],
+    cmd_help={
+        "help": "Does something awesome",
+        "example": "mycmd",
+    },
+)
+async def my_command(c: Client, m: Message):
+    msg = await m.handle_message("Processing...")
+    await msg.edit_msg("Hello from my external APM plugin!")
+```
+
 <br>
 
 ## About the Repo
 
-> Currently Running Stable version of Altruix.  
-> [![](https://img.shields.io/badge/Altruix-v0.0.1-color=red)](#)  
-> Is our project under active maintenance?  
-> [![Maintenance](https://img.shields.io/badge/Maintained%3F-Yes-color=green)](https://github.com/Altruix/Altruix/graphs/commit-activity)   
-> Developers aka Contributors for the Project.  
+> Currently Running Stable version of Altruix.
+> [![](https://img.shields.io/badge/Altruix-v0.2.0-color=red)](#)
+> Is our project under active maintenance?
+> [![Maintenance](https://img.shields.io/badge/Maintained%3F-Yes-color=green)](https://github.com/Altruix/Altruix/graphs/commit-activity)
+> Developers aka Contributors for the Project.
 > [![Contributors](https://img.shields.io/github/contributors/Altruix/Altruix?style=flat-square&color=orange)](https://github.com/Altruix/Altruix/graphs/contributors)
 
 ## Credits

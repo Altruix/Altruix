@@ -1,0 +1,22 @@
+name: Code quality
+on:
+  push:
+    paths:
+      - "**.py"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - ".github/workflows/quality.yml"
+  pull_request:
+  workflow_dispatch:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python modules
+        run: python -m compileall -q Main

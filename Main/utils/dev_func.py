@@ -6,16 +6,16 @@
 #
 # All rights reserved.
 
-
 import sys
 import shlex
 import asyncio
 import traceback
 from io import StringIO
-from Main import Altruix
 from pprint import pprint
-from pyrogram import Client
-from pyrogram.types import Message
+from Main import Altruix
+from Main.core.types.client import AltruixTelegramClient as Client
+from Main.core.types.message import Message
+from Main.utils.command import resolve_command
 
 
 p = print
@@ -23,24 +23,27 @@ pp = pprint
 
 
 async def execute_py(c: Client, code: str, m: Message):
+    namespace = {}
     exec(
         "async def __exec_py(c, m):"
-        + "\n rm = m.reply_to_message"
+        + "\n rm = getattr(m, 'reply_to_message', None)"
         + "\n message = m"
         + "\n client = Client = c"
-        + "\n chat = m.chat"
-        + "\n user = m.from_user"
-        + "".join(f"\n {l}" for l in code.split("\n"))
+        + "\n chat = getattr(m, 'chat', None)"
+        + "\n user = getattr(m, 'from_user', None)"
+        + "".join(f"\n {l}" for l in code.split("\n")),
+        globals(),
+        namespace,
     )
-    return await locals()["__exec_py"](c, m)
+    return await namespace["__exec_py"](c, m)
 
 
-async def eval_py(client: Client, code: str, m: Message):
+async def eval_py(client: Client, code: str, m: Message) -> str:
     old_stderr = sys.stderr
     old_stdout = sys.stdout
     redirected_output = sys.stdout = StringIO()
     redirected_error = sys.stderr = StringIO()
-    stdout, stderr, exc = None, None, None
+    exc = None
     try:
         await execute_py(client, code, m)
     except Exception:
@@ -49,7 +52,7 @@ async def eval_py(client: Client, code: str, m: Message):
     stderr = redirected_error.getvalue()
     sys.stdout = old_stdout
     sys.stderr = old_stderr
-    evaluation = ""
+
     if exc:
         evaluation = exc
     elif stderr:
@@ -57,32 +60,33 @@ async def eval_py(client: Client, code: str, m: Message):
     elif stdout:
         evaluation = stdout
     else:
-        evaluation = Altruix.get_string("NO_OUTPUT")
+        evaluation = Altruix.get_string("NO_OUTPUT") or "No output."
     return evaluation.strip()
 
 
 async def exec_terminal(command: str):
     success = True
     return_code = 0
-    command = shlex.split(command)
+    cmd_args = shlex.split(command)
     output = ""
+    if not cmd_args:
+        return False, "No command provided.", 2
+    cmd_args = resolve_command(cmd_args)
     try:
         process = await asyncio.create_subprocess_exec(
-            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            *cmd_args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
-        return_code = process.returncode
         stdout, stderr = await process.communicate()
-        output += stdout.decode("utf-8").strip()
+        return_code = process.returncode
+        output += stdout.decode("utf-8", errors="ignore").strip()
         if stderr:
-            output += "\n" + stderr.decode("utf-8").strip()
-        success = True
+            output += "\n" + stderr.decode("utf-8", errors="ignore").strip()
+        success = return_code == 0
     except Exception:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        errors = traceback.format_exception(etype=exc_type, value=exc_obj, tb=exc_tb)
         success = False
-        output += errors[-1]
+        output += traceback.format_exc()
     return success, output, return_code
 
 
-Altruix.__setattr__("run_cmd", exec_terminal)
-Altruix.__setattr__("eval_py", eval_py)
+Altruix.run_cmd = exec_terminal
+Altruix.eval_py = eval_py

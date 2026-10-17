@@ -10,65 +10,90 @@ import httpx
 import random
 import contextlib
 from json import JSONDecodeError
-from typing import Set, List, Union
+from typing import List, Tuple, Optional, Union
 
 
 class Paste:
     def __init__(
         self,
-        text: str = None,
+        text: Union[str, bytes] = None,
         title: str = None,
         author: str = None,
         file_ext: str = None,
         service: str = None,
     ) -> None:
-        self.httpx = httpx.AsyncClient()
+        self.httpx = httpx.AsyncClient(timeout=15.0, follow_redirects=True)
         self.text: Union[str, bytes] = text
         self.title: str = title
         self.author: str = author
         self.file_ext: str = file_ext
         self.service: str = service
 
-    async def to_nekobin(self) -> Set[Union[str, None]]:
-        url = "https://nekobin.com/api/documents/"
-        data = {
-            "content": self.text,
-            "title": self.title,
-            "author": self.author,
-        }
-        resp = await self.httpx.post(url, json=data)
-        try:
-            data = resp.json()
-            return "nekobin", f"https://nekobin.com/{data['result']['key']}"
-        except (KeyError, TypeError, TimeoutError, JSONDecodeError):
-            return None, None
+    def _get_text(self) -> str:
+        if isinstance(self.text, bytes):
+            return self.text.decode("utf-8", errors="ignore")
+        return str(self.text or "")
 
-    async def to_spacebin(self) -> Set[Union[str, None]]:
-        url = "https://spaceb.in/api/v1/documents"
-        data = {"content": self.text, "extension": "txt"}
-        r = await self.httpx.post(url, data=data)
+    async def to_spacebin(self) -> Tuple[Optional[str], Optional[str]]:
+        url = "https://spaceb.in/api/"
         try:
-            data = r.json()
-            return "spacebin", f'https://spaceb.in/{data["payload"]["id"]}'
-        except (KeyError, TypeError, TimeoutError, JSONDecodeError):
-            return None, None
+            r = await self.httpx.post(url, json={"content": self._get_text()})
+            if r.status_code == 200:
+                data = r.json()
+                doc_id = data.get("payload", {}).get("id")
+                if doc_id:
+                    return "spacebin", f"https://spaceb.in/{doc_id}"
+        except (KeyError, TypeError, TimeoutError, JSONDecodeError, httpx.HTTPError):
+            pass
+        return None, None
 
-    async def to_hastebin(self) -> Set[Union[str, None]]:
-        r = await self.httpx.post("https://hastebin.com/documents", data=self.text)
+    async def to_dpaste(self) -> Tuple[Optional[str], Optional[str]]:
+        url = "https://dpaste.org/api/"
+        payload = {"content": self._get_text(), "format": "json", "expiry_days": 14}
+        if self.title:
+            payload["title"] = self.title
         try:
-            data = r.json()
-            return "hastebin", f'https://hastebin.com/{data["key"]}'
-        except (KeyError, TypeError, TimeoutError, JSONDecodeError):
-            return None, None
+            r = await self.httpx.post(url, data=payload)
+            if r.status_code == 200:
+                data = r.json()
+                if "url" in data:
+                    return "dpaste", data["url"]
+        except (KeyError, TypeError, TimeoutError, JSONDecodeError, httpx.HTTPError):
+            pass
+        return None, None
 
-    async def paste(self) -> Set[Union[str, None]]:
+    async def to_pasters(self) -> Tuple[Optional[str], Optional[str]]:
+        url = "https://paste.rs/"
+        try:
+            r = await self.httpx.post(url, content=self._get_text())
+            if r.status_code in (200, 201):
+                link = r.text.strip()
+                if link.startswith("http"):
+                    return "paste.rs", link
+        except (KeyError, TypeError, TimeoutError, JSONDecodeError, httpx.HTTPError):
+            pass
+        return None, None
+
+    async def to_cnet(self) -> Tuple[Optional[str], Optional[str]]:
+        url = "https://paste.c-net.org/"
+        try:
+            r = await self.httpx.post(url, content=self._get_text())
+            if r.status_code == 200:
+                link = r.text.strip()
+                if link.startswith("http"):
+                    return "c-net", link
+        except (KeyError, TypeError, TimeoutError, JSONDecodeError, httpx.HTTPError):
+            pass
+        return None, None
+
+    async def paste(self) -> Tuple[Optional[str], Optional[str]]:
         service, paste_url = None, None
         if not self.service:
             available_functions = [
                 getattr(self, m)
                 for m in dir(self)
                 if not m.startswith("__")
-                and m.startswith("to")
+                and m.startswith("to_")
                 and callable(getattr(self, m))
             ]
             while paste_url is None and available_functions:
@@ -85,11 +110,11 @@ class Paste:
 
     @property
     def all_bins(self) -> List[str]:
-        return [
-            m.strip("to_")
+        return sorted([
+            m.removeprefix("to_")
             for m in dir(self)
-            if not m.startswith("__") and m.startswith("to")
-        ]
+            if not m.startswith("__") and m.startswith("to_") and callable(getattr(self, m))
+        ])
 
     def __repr__(self) -> str:
         return f"Paste(text={self.text}, title={self.title}, author={self.author}, file_ext={self.file_ext})"

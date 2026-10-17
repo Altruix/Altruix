@@ -6,17 +6,17 @@
 #
 # All rights reserved.
 
-
+import sys
 from Main import Altruix
-from pyrogram import Client
-import Main.core.types.message
 
 
-if not hasattr(Client, "__send_custom__"):
-    setattr(Client, "__send_custom__", Client.invoke)
-
-import Main.core.types.client
+def main() -> None:
+    try:
+        Altruix.run()
+    except (KeyboardInterrupt, SystemExit):
+        Altruix.log("Altruix process terminated.")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
-    Altruix.run()
+    main()

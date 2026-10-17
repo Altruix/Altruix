@@ -6,123 +6,98 @@
 #
 # All rights reserved.
 
-
 import re
 import glob
 import asyncio
 import contextlib
+from pathlib import Path
 from Main import Altruix
-from pyrogram import filters
+from Main.utils.custom_filters import filters
 from Main.core.decorators import log_errors
-from pyrogram.types import (
-    Message, ForceReply, CallbackQuery, KeyboardButton, ReplyKeyboardMarkup,
-    ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup)
+from telethon import custom
 
 
 @Altruix.bot.on_message(filters.command("start", "/") & filters.private)
 @log_errors
-async def start_command_handler(_, m: Message):
-    payload = m.text.replace("/start", "").strip()
+async def start_command_handler(c, m):
+    payload = m.text.replace("/start", "").strip() if m.text else ""
     if not payload:
         path_ = "./cache/bot_st_media.*"
-        file = (
-            glob.glob(path_)[0] if glob.glob(path_) else "./Main/assets/images/logo.jpg"
-        )
-        await m.reply_file(
-            file,
-            caption=Altruix.get_string("BOT_ST_MSG").format(
-                m.from_user.mention, Altruix.config.CUSTOM_BT_START_MSG or ""
-            ),
-            reply_markup=ReplyKeyboardRemove(),
-            send_msg_if_file_invalid=True,
-        )
-        if Altruix.training_wheels_protocol and m.from_user.id in Altruix.auth_users:
+        logo = Path(__file__).resolve().parents[1] / "assets" / "images" / "logo.jpg"
+        file = glob.glob(path_)[0] if glob.glob(path_) else str(logo)
+        mention = m.from_user.mention if m.from_user else "User"
+        caption_template = Altruix.get_string("BOT_ST_MSG") or "Welcome {0}! {1}"
+        caption = caption_template.format(mention, Altruix.config.CUSTOM_BT_START_MSG or "")
+        await m.reply_file(file, caption=caption, send_msg_if_file_invalid=True)
+
+        if Altruix.training_wheels_protocol and (not m.from_user or m.from_user.id in Altruix.auth_users):
+            buttons = [
+                [
+                    custom.Button.inline("Yes", b"session_yes"),
+                    custom.Button.inline("No", b"session_no"),
+                ]
+            ]
             await m.reply(
-                "You'll have to add a user session to disable TWP, would you like to proceed?",
-                reply_markup=ReplyKeyboardMarkup(
-                    [[KeyboardButton("Yeah sure")]],
-                    resize_keyboard=True,
-                    one_time_keyboard=True,
-                ),
-            )
-            _ = await m.from_user.listen()
-            await m.reply(
-                "Alright, let's get started.", reply_markup=ReplyKeyboardRemove()
-            )
-            await asyncio.sleep(1)
-            await m.reply(
-                "Do you have the string session already generated?.",
-                reply_markup=InlineKeyboardMarkup(
-                    [
-                        [
-                            InlineKeyboardButton("Yes", callback_data="session_yes"),
-                            InlineKeyboardButton("No", callback_data="session_no"),
-                        ]
-                    ]
-                ),
+                "You'll need to add a user session to activate userbot features.\n"
+                "Do you have a Telethon string session already generated?",
+                buttons=buttons,
             )
     elif payload == "add_session":
-        await m.reply("Alright, let's get started.", reply_markup=ReplyKeyboardRemove())
-        await asyncio.sleep(1)
+        buttons = [
+            [
+                custom.Button.inline("Yes", b"session_yes"),
+                custom.Button.inline("No", b"session_no"),
+            ]
+        ]
         await m.reply(
-            "Do you have the string session already generated?.",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton("Yes", callback_data="session_yes"),
-                        InlineKeyboardButton("No", callback_data="session_no"),
-                    ]
-                ]
-            ),
+            "Do you have a Telethon string session already generated?",
+            buttons=buttons,
         )
 
 
 @Altruix.bot.on_callback_query(filters.regex("^add_session"))
 @log_errors
-async def add_session_menu_cb_handler(_, cb: CallbackQuery):
-    await cb.message.edit(
-        "Alright, let's get started.", reply_markup=ReplyKeyboardRemove()
-    )
-    await asyncio.sleep(1)
-    await cb.message.reply(
-        "Do you have the string session already generated?.",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Yes", callback_data="session_yes"),
-                    InlineKeyboardButton("No", callback_data="session_no"),
-                ]
-            ]
-        ),
+async def add_session_menu_cb_handler(c, cb):
+    buttons = [
+        [
+            custom.Button.inline("Yes", b"session_yes"),
+            custom.Button.inline("No", b"session_no"),
+        ]
+    ]
+    await cb.edit(
+        "Do you have a Telethon string session already generated?",
+        buttons=buttons,
     )
 
 
 @Altruix.bot.on_callback_query(filters.regex("^session_yes"))
 @log_errors
-async def add_session_cb_handler(_, cb: CallbackQuery):
-    with contextlib.suppress(Exception):
-        await cb.message.delete()
-    await cb.message.reply(
-        "Alright... send me your string session.\nUse /cancel to cancel the current operation.",
-        reply_markup=ForceReply(),
-    )
-    # session = await cb.from_user.listen(filters.regex(r"(\S{300,400})",
-    # timeout=600))
-    while True:
-        session: Message = await cb.from_user.listen(filters.text, timeout=600)
-        if session.text.startswith("/"):
-            await cb.message.reply("The current process was cancelled.")
+async def add_session_yes_cb_handler(c, cb):
+    await cb.answer()
+    async with Altruix.bot.conversation(cb.chat_id, timeout=300) as conv:
+        prompt = await conv.send_message(
+            "Please send your Telethon string session.\n\n"
+            "💡 You can generate one in terminal without risk of expired codes:\n"
+            "<code>py -3 Main/scripts/session_gen.py</code>\n\n"
+            "Use /cancel to cancel.",
+            parse_mode="html",
+        )
+        session_resp = await conv.get_response(prompt)
+        text = session_resp.raw_text.strip()
+        if text.startswith("/cancel"):
+            await conv.send_message("Session setup cancelled.")
             return
-        if match := re.search(r"(\S{300,400})", session.text):
-            session = match[1]
-            break
-        else:
-            await session.reply("Please send me a valid string session.", quote=True)
-    status = await cb.message.reply(
-        "<code>Processing the given string session...</code>"
-    )
-    new_session = await Altruix.add_session(session, status)
-    await new_session.send_message(
-        Altruix.bot.info.id,
-        "<b>Altruix have been successfully connected with your account!</b> \nPlease visit @AltruixUB for any support or help!",
-    )
+
+        match = re.search(r"(\S{100,600})", text)
+        if not match:
+            await conv.send_message("The string session format looks invalid. Please try again.")
+            return
+
+        session_str = match.group(1)
+        status = await conv.send_message("Processing and connecting session...")
+        try:
+            new_client = await Altruix.add_session(session_str, status)
+            if new_client:
+                await conv.send_message("Session successfully added and connected!")
+        except Exception as e:
+            await status.edit(f"Failed to connect session: {e}")

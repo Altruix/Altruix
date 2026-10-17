@@ -13,10 +13,10 @@
 
 import asyncio
 from Main import Altruix
-from pyrogram import Client as client
+from Main.core.types import AltruixTelegramClient
 
 
-async def set_inline_in_botfather(Client: client):
+async def set_inline_in_botfather(Client: AltruixTelegramClient):
     await Client.send_message("botfather", "/cancel")
     await asyncio.sleep(1)
     message = await Client.send_message("botfather", "/setinline")

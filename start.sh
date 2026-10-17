@@ -1,63 +1,23 @@
-declare -A pm;
-pm[/etc/redhat-release]=yum
-pm[/etc/arch-release]=pacman
-pm[/etc/gentoo-release]=emerge
-pm[/etc/SuSE-release]=zypp
-pm[/etc/debian_version]=apt-get
-pm[/etc/alpine-release]=apk
+#!/usr/bin/env bash
+set -euo pipefail
 
-if [ $(echo $PREFIX | grep -o 'com.termux') ];then
-    on_termux=True
-else
-    on_termux=False  
+cd "$(dirname "$0")"
+
+PYTHON_BIN="${PYTHON:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+    echo "Python 3.10 or newer is required. Set PYTHON to the interpreter path if needed." >&2
+    exit 1
 fi
 
-install_package () {
-    if [ "$on_termux" == "False" ]; then
-        { for f in ${!pm[@]}  
-            do
-                if [[ -f $f ]];then
-                    echo "Using : [${pm[$f]}] to install packages"
-                    sudo ${pm[$f]} install "$1" -y || ${pm[$f]} install "$1" -y
-                    fi
-            done    }
-    else
-        echo "Using : [pkg] to install packages"
-        pkg install "$1" -y 
+if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+    echo "Python 3.10 or newer is required." >&2
+    exit 1
 fi
-}
 
-package_check () {
-if [ $(dpkg-query -W -f='${Status}' $1 2>/dev/null | grep -c "ok installed") -eq 0 ];
-then
-  echo "Package $1 not found. Installing package $1"
-  install_package "$1"   
+if [ ! -x .venv/bin/python ]; then
+    "$PYTHON_BIN" -m venv .venv
 fi
-}
 
-install_all_packages () {
-    echo "Checking and installing Required packages...."
-    package_check 'python3'
-    package_check 'ffmpeg'
-    if [ "$on_termux" == "False" ]; then
-        package_check 'python3-venv'
-    fi
-}
-
-activate_venv_and_install_pip_packages () {
-    sudo python3 -m venv venv || python3 -m venv venv
-    source venv/bin/activate
-    if [ "$on_termux" == "True" ]; then
-        pip install wheel && pkg install libjpeg-turbo && LDFLAGS="-L/system/lib/" CFLAGS="-I/data/data/com.termux/files/usr/include/" pip install Pillow
-    fi
-    sudo pip3 install --upgrade pip || pip3 install --upgrade pip
-    sudo pip3 install -r requirements.txt || pip3 install -r requirements.txt
-    sudo python3 -m Main || python3 -m Main
-}
-
-run () {
-    install_all_packages
-    activate_venv_and_install_pip_packages
-}
-
-run
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e .
+exec .venv/bin/python -m Main

@@ -23,7 +23,7 @@ import importlib
 import contextlib
 from traceback import format_exc
 from types import SimpleNamespace
-from pyrogram.types import Message
+from Main.core.types import Message
 from typing import Any, List, Union, Callable, Optional
 from Main.core.exceptions import (
     Package404, AlreadyInstalled, InvalidPackageToUpdate)

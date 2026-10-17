@@ -6,90 +6,193 @@
 #
 # All rights reserved.
 
+from typing import Optional
+from telethon import utils
 from Main import Altruix
-from pyrogram import Client
+from Main.core.types.client import AltruixTelegramClient as Client
 from Main.core.types.message import Message
 
 
-bcast_db = Altruix.db.make_collection("Broadcast")
+async def resolve_chat_id(c: Client, target: str) -> Optional[int]:
+    """Resolve a chat ID, username, or t.me link to an integer peer ID."""
+    target = target.strip()
+    if target.lstrip("-").isdigit():
+        return int(target)
+
+    # Strip URL formatting
+    for p in ("https://t.me/", "http://t.me/", "t.me/"):
+        if target.startswith(p):
+            target = target[len(p):]
+            break
+    target = target.rstrip("/")
+    if not target:
+        return None
+
+    # Try resolving entity via Telethon
+    candidates = [target]
+    if not target.startswith("@") and not target.startswith("+"):
+        candidates.append(f"@{target}")
+    else:
+        candidates.append(target.lstrip("@"))
+
+    for cand in candidates:
+        try:
+            entity = await c.get_entity(cand)
+            if entity:
+                return utils.get_peer_id(entity)
+        except Exception:
+            continue
+    return None
 
 
 @Altruix.register_on_cmd(
     ["badd", "broadcastadd", "bcastadd"],
     bot_mode_unsupported=True,
     cmd_help={
-        "help": "Add the chat to the db",
-        "example": "badd <chatid>",
+        "help": "Add chat(s) to the broadcast database by ID, @username, or link (supports comma-separated bulk add).",
+        "example": "badd @channel1, @channel2, -1001234567890",
     },
 )
 async def bcast_add(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
+    if Altruix.db is None:
+        return await msg.edit("No database connected.")
+    bcast_db = Altruix.db.make_collection("Broadcast")
     my_id = c.myself.id
+
     if m.user_input:
-        chat_id = m.user_input
-        if not chat_id.isdigit():
-            return await msg.edit("Invalid chat id")
+        raw_targets = [t.strip() for t in m.user_input.split(",") if t.strip()]
     else:
-        chat_id = m.chat.id
-    check = await bcast_db.find_one({"chat_id": int(chat_id), "client_id": my_id})
-    if check:
-        return await msg.edit("This chat is already in database.")
-    await bcast_db.insert_one({"chat_id": int(chat_id), "client_id": my_id})
-    await msg.edit(f"Added <code>{chat_id}</code> to the database")
+        raw_targets = [str(m.chat.id)]
+
+    added = []
+    already_in = []
+    failed = []
+
+    for target_str in raw_targets:
+        chat_id = await resolve_chat_id(c, target_str)
+        if chat_id is None:
+            failed.append(target_str)
+            continue
+        check = await bcast_db.find_one({"chat_id": int(chat_id), "client_id": my_id})
+        if check:
+            already_in.append(str(chat_id))
+            continue
+        await bcast_db.insert_one({"chat_id": int(chat_id), "client_id": my_id})
+        added.append(str(chat_id))
+
+    res_parts = []
+    if added:
+        res_parts.append(f"✅ <b>Added {len(added)} chat(s):</b> {', '.join(f'<code>{a}</code>' for a in added)}")
+    if already_in:
+        res_parts.append(f"ℹ️ <b>Already in database ({len(already_in)}):</b> {', '.join(f'<code>{a}</code>' for a in already_in)}")
+    if failed:
+        res_parts.append(f"❌ <b>Failed to resolve ({len(failed)}):</b> {', '.join(f'<code>{f}</code>' for f in failed)}")
+
+    await msg.edit("\n".join(res_parts) if res_parts else "No chats processed.", parse_mode="html")
 
 
 @Altruix.register_on_cmd(
     ["bremove", "brm", "broadcastremove", "broadcastrm", "bcastrm", "bcastremove"],
     bot_mode_unsupported=True,
     cmd_help={
-        "help": "Remove the chat from the db",
-        "example": "bcastrm <chatid>",
+        "help": "Remove chat(s) from the broadcast database by ID, @username, or link (supports comma-separated bulk remove).",
+        "example": "bcastrm @channel1, @channel2, <chatid>",
     },
 )
 async def bcast_remove(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
+    if Altruix.db is None:
+        return await msg.edit("No database connected.")
+    bcast_db = Altruix.db.make_collection("Broadcast")
+
     if m.user_input:
-        chat_id = m.user_input
-        if not chat_id.isdigit():
-            return await msg.edit("Invalid chat id")
+        raw_targets = [t.strip() for t in m.user_input.split(",") if t.strip()]
     else:
-        chat_id = m.chat.id
-    check = await bcast_db.find_one({"chat_id": int(chat_id), "client_id": c.myself.id})
-    if not check:
-        return await msg.edit("This chat is not in the db")
-    await bcast_db.delete_one({"chat_id": int(chat_id), "client_id": c.myself.id})
-    await msg.edit(f"Deleted <code>{chat_id}</code> from the database")
+        raw_targets = [str(m.chat.id)]
+
+    deleted = []
+    not_found = []
+    failed = []
+
+    for target_str in raw_targets:
+        chat_id = await resolve_chat_id(c, target_str)
+        if chat_id is None:
+            failed.append(target_str)
+            continue
+        check = await bcast_db.find_one({"chat_id": int(chat_id), "client_id": c.myself.id})
+        if not check:
+            not_found.append(str(chat_id))
+            continue
+        await bcast_db.delete_one({"chat_id": int(chat_id), "client_id": c.myself.id})
+        deleted.append(str(chat_id))
+
+    res_parts = []
+    if deleted:
+        res_parts.append(f"🗑️ <b>Deleted {len(deleted)} chat(s):</b> {', '.join(f'<code>{d}</code>' for d in deleted)}")
+    if not_found:
+        res_parts.append(f"ℹ️ <b>Not in database ({len(not_found)}):</b> {', '.join(f'<code>{n}</code>' for n in not_found)}")
+    if failed:
+        res_parts.append(f"❌ <b>Failed to resolve ({len(failed)}):</b> {', '.join(f'<code>{f}</code>' for f in failed)}")
+
+    await msg.edit("\n".join(res_parts) if res_parts else "No chats processed.", parse_mode="html")
 
 
 @Altruix.register_on_cmd(
     ["bcast", "broadcast"],
     bot_mode_unsupported=True,
     cmd_help={
-        "help": "To broadcast the replied message",
-        "example": "bcast (reply to  a message)",
+        "help": "Broadcast the replied message to all saved chats in DB, or to comma-separated chats/usernames.",
+        "example": "bcast (replying to message) or bcast @chat1, @chat2, -100123456",
     },
     requires_reply=True,
 )
 async def broadcast(c: Client, m: Message):
-    success = 0
-    err = 0
     msg = await m.handle_message("PROCESSING")
+
+    # If specific target(s) are provided in user input, broadcast to them
+    if m.user_input:
+        raw_targets = [t.strip() for t in m.user_input.split(",") if t.strip()]
+        success = 0
+        err = 0
+        failed_resolve = []
+        for target_str in raw_targets:
+            chat_id = await resolve_chat_id(c, target_str)
+            if chat_id is None:
+                failed_resolve.append(target_str)
+                continue
+            try:
+                await c.send_message(chat_id, m.reply_to_message)
+                success += 1
+            except Exception:
+                err += 1
+        res = f"📢 Broadcasted to <code>{success}</code> specified chat(s) (errors: <code>{err}</code>)"
+        if failed_resolve:
+            res += f"\n❌ Unresolved: {', '.join(f'<code>{f}</code>' for f in failed_resolve)}"
+        return await msg.edit(res, parse_mode="html")
+
+    # Otherwise broadcast to all saved chats in DB
+    if Altruix.db is None:
+        return await msg.edit("No database connected and no target chat specified.")
+
+    bcast_db = Altruix.db.make_collection("Broadcast")
     chats = []
     async for x in bcast_db.find({"client_id": c.myself.id}):
         chats.append(x["chat_id"])
+
     if not chats:
-        return await msg.edit("No chats saved in db")
+        return await msg.edit("No chats saved in broadcast database.")
+
+    success = 0
+    err = 0
     for chat in chats:
         try:
-            await c.copy_message(
-                chat_id=int(chat),
-                from_chat_id=m.chat.id,
-                message_id=m.reply_to_message.id,
-            )
+            await c.send_message(int(chat), m.reply_to_message)
             success += 1
         except Exception:
-            Altruix.log()
             err += 1
+
     await msg.edit(
-        f"Succesfully broadcasted in <code>{success}</code> chats and errors in <code>{err}</code> chats!"
+        f"📢 Broadcast finished: sent to <code>{success}</code> chats (errors: <code>{err}</code>)!",
+        parse_mode="html",
     )

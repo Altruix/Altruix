@@ -11,7 +11,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 from Main import Altruix
-from pyrogram import Client
+from Main.core.types import AltruixTelegramClient as Client
 from os import remove as rmv
 from bs4 import BeautifulSoup
 from json import loads as j_loads
@@ -39,53 +39,50 @@ from Main.utils.file_helpers import run_in_exc
 )
 async def reverse_search_func_(c: Client, m: Message):
     start = pc()
-    rm = m.reply_to_message
+    rm = m.reply_to_message or (await m.get_reply_message() if hasattr(m, "get_reply_message") else None)
+    if not rm or not rm.media:
+        return await m.handle_message("INVALID_REPLY")
     msg = await m.handle_message("PROCESSING")
-    if (
-        rm.photo
-        or (rm.sticker and not rm.sticker.is_animated)
-        or (
-            rm.document
-            and c.guess_mime_type(rm.document.file_name).startswith("image/")
-        )
-    ):
-        photo = await m.reply_to_message.download(in_memory=True)
-        if m.user_args and m.user_args.y and m.user_args.y.lower() == "yandex":
-            img_search_url = await reverse_search_in_yandex(photo).parse()
-            if not img_search_url:
-                return await msg.edit_msg(
-                    "YANDEX_FAILED", string_args=("Results not found!")
-                )
-            end = pc()
-            await msg.edit_msg(
-                "YANDEX_RESULT",
-                string_args=(img_search_url, round(end - start, 2)),
-                disable_web_page_preview=True,
-            )
-            return rmv(photo)
-        else:
-            img_r = reverse_search_in_google(photo)
-            fetch_url = await img_r.reverse()
-            if not fetch_url:
-                return await msg.edit_msg(
-                    "<code>Given image not found on Google.</code>"
-                )
-            if fetch_url.get("best_guess") and fetch_url.get("similar_images"):
-                await msg.edit_msg("GOOGLE_LOOKING")
-            else:
-                return await msg.edit_msg("GOOGLE_NOT_FOUND")
-            end = pc()
+    bio = BytesIO()
+    bio.name = "image.png"
+    await c.download_media(rm, file=bio)
+    bio.seek(0)
+    photo = bio
+    if m.user_args and ("y" in m.user_args or str(m.user_args.y or "").lower() == "yandex"):
+        img_search_url = await reverse_search_in_yandex(photo).parse()
+        if not img_search_url:
             return await msg.edit_msg(
-                "GOOGLE_RESULT",
-                string_args=(
-                    fetch_url,
-                    fetch_url["best_guess"],
-                    fetch_url["similar_images"],
-                    fetch_url["url"],
-                    round(end - start, 2),
-                ),
-                disable_web_page_preview=True,
+                "YANDEX_FAILED", string_args=("Results not found!")
             )
+        end = pc()
+        return await msg.edit_msg(
+            "YANDEX_RESULT",
+            string_args=(img_search_url, round(end - start, 2)),
+            disable_web_page_preview=True,
+        )
+    else:
+        img_r = reverse_search_in_google(photo)
+        fetch_url = await img_r.reverse()
+        if not fetch_url:
+            return await msg.edit_msg(
+                "<code>Given image not found on Google.</code>"
+            )
+        if fetch_url.get("best_guess") and fetch_url.get("similar_images"):
+            await msg.edit_msg("GOOGLE_LOOKING")
+        else:
+            return await msg.edit_msg("GOOGLE_NOT_FOUND")
+        end = pc()
+        return await msg.edit_msg(
+            "GOOGLE_RESULT",
+            string_args=(
+                fetch_url,
+                fetch_url["best_guess"],
+                fetch_url["similar_images"],
+                fetch_url["url"],
+                round(end - start, 2),
+            ),
+            disable_web_page_preview=True,
+        )
     await msg.edit_msg("INVALID_REPLY")
 
 

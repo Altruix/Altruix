@@ -6,8 +6,9 @@
 #
 # All rights reserved.
 
-from pyromod import listen
 from .core.client import AltruixClient
-
+from .utils.suppress import suppress_error, safe_suppress, suppress
 
 Altruix = AltruixClient()
+
+__all__ = ["Altruix", "AltruixClient", "suppress_error", "safe_suppress", "suppress"]

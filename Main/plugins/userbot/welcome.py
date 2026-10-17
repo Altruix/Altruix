@@ -8,8 +8,8 @@
 
 
 from Main import Altruix
-from pyrogram import Client, filters
-from Main.core.types.message import Message
+from Main.core.types import AltruixTelegramClient as Client, Message
+from Main.utils.custom_filters import Filters as filters
 
 
 welcome_db = Altruix.db.make_collection("WELCOME")
@@ -24,19 +24,22 @@ welcome_db = Altruix.db.make_collection("WELCOME")
     requires_reply=True,
 )
 async def add_welcome_cmd(c: Client, m: Message):
-    reply_msg = m.reply_to_message
+    reply_msg = m.reply_to_message or (await m.get_reply_message() if hasattr(m, "get_reply_message") else None)
+    if not reply_msg:
+        return await m.handle_message("INVALID_REPLY")
     if not Altruix.log_chat:
         return await m.handle_message("ERROR_404_NO_LOG_CHAT")
+    curr_chat_id = m.chat_id or getattr(m.chat, "id", None)
     save_welcome = await reply_msg.copy(int(Altruix.log_chat))
-    if await welcome_db.find_one({"chat_id": m.chat.id, "client_id": c.myself.id}):
+    if await welcome_db.find_one({"chat_id": curr_chat_id, "client_id": c.myself.id}):
         await welcome_db.update_one(
-            {"chat_id": m.chat.id, "client_id": c.myself.id},
+            {"chat_id": curr_chat_id, "client_id": c.myself.id},
             {"$set": {"msg_id": save_welcome.id}},
         )
     else:
         await welcome_db.insert_one(
             {
-                "chat_id": m.chat.id,
+                "chat_id": curr_chat_id,
                 "msg_id": save_welcome.id,
                 "client_id": c.myself.id,
             }
@@ -52,9 +55,10 @@ async def add_welcome_cmd(c: Client, m: Message):
     },
 )
 async def del_welcome_cmd(c: Client, m: Message):
-    if not await welcome_db.find_one({"chat_id": m.chat.id, "client_id": c.myself.id}):
+    curr_chat_id = m.chat_id or getattr(m.chat, "id", None)
+    if not await welcome_db.find_one({"chat_id": curr_chat_id, "client_id": c.myself.id}):
         return await m.handle_message("NO_WELCOME_SAVED")
-    await welcome_db.delete_one({"chat_id": m.chat.id, "client_id": c.myself.id})
+    await welcome_db.delete_one({"chat_id": curr_chat_id, "client_id": c.myself.id})
     await m.handle_message("WELCOME_REMOVED")
 
 
@@ -66,23 +70,29 @@ async def del_welcome_cmd(c: Client, m: Message):
     },
 )
 async def welcome_settings_cmd(c: Client, m: Message):
+    curr_chat_id = m.chat_id or getattr(m.chat, "id", None)
     welcome_data = await welcome_db.find_one(
-        {"chat_id": m.chat.id, "client_id": c.myself.id}
+        {"chat_id": curr_chat_id, "client_id": c.myself.id}
     )
     if not welcome_data or not Altruix.log_chat:
         return await m.handle_message("NO_WELCOME_SAVED")
     await m.handle_message("CURRENT_WELCOME")
     await c.copy_message(
         from_chat_id=int(Altruix.log_chat),
-        chat_id=int(m.chat.id),
+        chat_id=int(curr_chat_id),
         id=welcome_data["msg_id"],
         reply_to_message_id=m.id,
     )
 
 
-async def welcome_filter(filter, c: Client, m: Message):
+async def welcome_filter(c: Client, m: Message):
+    if not hasattr(c, "myself") or not c.myself:
+        return False
+    chat_id = getattr(m, "chat_id", None) or getattr(getattr(m, "chat", None), "id", None)
+    if not chat_id:
+        return False
     is_welcome_enabled = await welcome_db.find_one(
-        {"chat_id": m.chat.id, "client_id": c.myself.id}
+        {"chat_id": chat_id, "client_id": c.myself.id}
     )
     return bool(is_welcome_enabled)
 
@@ -129,11 +139,12 @@ async def welcome_users(c: Client, m: Message):
             first_name=first_name,
             last_name=last_name,
         )
+    chat_target = await m.get_input_chat() if hasattr(m, "get_input_chat") else (m.chat_id or m.chat.id)
     if not media:
-        await c.send_message(m.chat.id, text, reply_to_message_id=m.id)
+        await c.send_message(chat_target, text, reply_to=m.id)
     else:
         await welcome_message.copy(
-            chat_id=int(m.chat.id),
+            chat_id=chat_target,
             caption=text,
             reply_to_message_id=m.id,
         )

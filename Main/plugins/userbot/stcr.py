@@ -7,23 +7,29 @@
 # All rights reserved.
 
 import os
+import time
 import math
-import ffmpeg
+import shutil
+import asyncio
 from PIL import Image
 from Main import Altruix
-from typing import Union
-from pyrogram import Client, raw
-from pyrogram.file_id import FileId
-from hachoir.parser import createParser
-from ...core.types.message import Message
-from ...utils.file_helpers import run_in_exc
-from hachoir.metadata import extractMetadata
-from pyrogram.types import Message as Rmessage
-from pyrogram.errors.exceptions.bad_request_400 import PeerIdInvalid
+from typing import Union, Optional, Tuple
+from telethon import functions, types, errors, utils
+from Main.core.types import AltruixTelegramClient as Client
+from Main.core.types.message import Message
+from Main.utils.file_helpers import run_in_exc
+from Main.utils.suppress import suppress_error
+
+TEMP_DIR = os.path.abspath("./temp")
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 
 @run_in_exc
-def convertor_(input_file: str, w: int, h: int):
+def convertor_(input_file: str, w: int, h: int) -> str:
+    """Convert raw video to webm sticker using ffmpeg if installed."""
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("FFmpeg is not installed on this system.")
+    import ffmpeg
     out_file = f"{os.path.splitext(input_file)[0]}.webm"
     ffmpeg.input(input_file).output(
         out_file,
@@ -41,38 +47,36 @@ def convertor_(input_file: str, w: int, h: int):
     return out_file
 
 
-async def convert_(input_file):
+async def convert_(input_file: str) -> str:
     w, h = await decide_file_dem(input_file)
     return await convertor_(input_file, w, h)
 
 
 @run_in_exc
-def decide_file_dem(input_file: str):
-    metadata = extractMetadata(createParser(input_file))
-    if metadata.has("width") and metadata.has("height"):
-        if metadata.get("width") > metadata.get("height"):
-            return (-2, 512)
-        elif metadata.get("width") < metadata.get("height"):
-            return (512, -2)
-        return (512, 512)
+def decide_file_dem(input_file: str) -> Tuple[int, int]:
+    try:
+        from hachoir.parser import createParser
+        from hachoir.metadata import extractMetadata
+        metadata = extractMetadata(createParser(input_file))
+        if metadata and metadata.has("width") and metadata.has("height"):
+            if metadata.get("width") > metadata.get("height"):
+                return (-2, 512)
+            elif metadata.get("width") < metadata.get("height"):
+                return (512, -2)
+            return (512, 512)
+    except Exception:
+        pass
     return (512, -2)
-
-
-@Altruix.run_in_exc
-def decode_file_id(file_id):
-    file_id_ = FileId.decode(file_id)
-    return raw.types.InputDocument(
-        id=file_id_.media_id,
-        access_hash=file_id_.access_hash,
-        file_reference=file_id_.file_reference,
-    )
 
 
 async def getstickerfromcollection(name_: str):
     try:
-        return await Altruix.bot.invoke(
-            raw.functions.messages.GetStickerSet(
-                stickerset=raw.types.InputStickerSetShortName(short_name=name_),
+        target_client = Altruix.bot or (Altruix.clients[0] if Altruix.clients else None)
+        if not target_client:
+            return None
+        return await target_client.invoke(
+            functions.messages.GetStickerSetRequest(
+                stickerset=types.InputStickerSetShortName(short_name=name_),
                 hash=0,
             )
         )
@@ -81,31 +85,27 @@ async def getstickerfromcollection(name_: str):
 
 
 @Altruix.run_in_exc
-def resize_image(image):
-    im = Image.open(image)
-    if (im.width and im.height) < 512:
-        size1 = im.width
-        size2 = im.height
+def resize_image(image_path: str) -> str:
+    """Resize photo to fit Telegram sticker dimensions (512x512 max, one side exactly 512)."""
+    if not image_path or not os.path.exists(image_path):
+        raise ValueError(f"Invalid image file for sticker conversion: {image_path}")
+    im = Image.open(image_path)
+    if im.width < 512 and im.height < 512:
         if im.width > im.height:
-            scale = 512 / size1
-            size1new = 512
-            size2new = size2 * scale
+            scale = 512 / im.width
+            sizenew = (512, math.floor(im.height * scale))
         else:
-            scale = 512 / size2
-            size1new = size1 * scale
-            size2new = 512
-        size1new = math.floor(size1new)
-        size2new = math.floor(size2new)
-        sizenew = (size1new, size2new)
-        im = im.resize(sizenew)
+            scale = 512 / im.height
+            sizenew = (math.floor(im.width * scale), 512)
+        im = im.resize(sizenew, Image.Resampling.LANCZOS)
     else:
-        maxsize = (512, 512)
-        im.thumbnail(maxsize)
-    file_name = "kenged_sticker.png"
-    im.save(file_name, "PNG")
-    if os.path.exists(image):
-        os.remove(image)
-    return file_name
+        im.thumbnail((512, 512), Image.Resampling.LANCZOS)
+
+    out_file = os.path.join(TEMP_DIR, f"kanged_sticker_{int(time.time() * 1000)}.png")
+    im.save(out_file, "PNG")
+    if os.path.exists(image_path) and image_path != out_file:
+        os.remove(image_path)
+    return out_file
 
 
 cached_peer = {}
@@ -114,152 +114,216 @@ cached_peer = {}
 @Altruix.register_on_cmd(
     ["kang", "steal"],
     requires_reply=True,
-    cmd_help={"help": "Kang any sticker with just a cmd!", "example": "kang 😁"},
+    cmd_help={
+        "help": "Kang any sticker (static, animated, or video) or photo into your pack!",
+        "example": "kang 😁",
+        "user_args": [
+            {"arg": "pack", "help": "Custom pack name volume.", "requires_input": True},
+        ],
+    },
 )
-async def kang_fun(c: Client, m: Union[Message, Rmessage]):
-    pack_ = 0
+async def kang_fun(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
-    try:
-        if m.from_user.id in cached_peer:
-            peer_ = cached_peer.get(m.from_user.id) or cached_peer.get(m.from_user.id)
-        else:
-            peer_ = await Altruix.bot.resolve_peer(m.from_user.id)
-            cached_peer[m.from_user.id] = peer_
-    except (KeyError, PeerIdInvalid):
-        return await msg.edit_msg(
-            "START_YOUR_ASSISTANT", string_args=(Altruix.bot_info.username)
-        )
-    user_input = m.user_input
-    emoji = user_input or "😁"
-    if m.reply_to_message.sticker and m.reply_to_message.sticker.emoji:
-        emoji = m.reply_to_message.sticker.emoji
-    if m.reply_to_message.photo or (
-        m.reply_to_message.document
-        and c.guess_mime_type(m.reply_to_message.document.file_name).startswith(
-            "image/"
-        )
-    ):
-        photo_ = await m.reply_to_message.download()
-        type_ = ""
-        sticker_name = ""
-        sticker_limit = 120
-        new_photo = await resize_image(photo_)
-        file_ = await Altruix.bot.upload_doc(new_photo, peer_)
-    elif m.reply_to_message.video or m.reply_to_message.animation:
-        down_ = await convert_(await m.reply_to_message.download())
-        type_ = "webm"
-        sticker_name = "VideoStickers"
-        sticker_limit = 50
-        file_ = await Altruix.bot.upload_doc(down_, peer_, force_file=True)
-    elif m.reply_to_message.sticker:
-        if m.reply_to_message.sticker.is_animated:
-            type_ = "tgs"
-            sticker_name = "Animated"
-            sticker_limit = 50
-            down_ = await m.reply_to_message.download()
-            file_ = await Altruix.bot.upload_doc(down_, peer_, force_file=True)
-        if m.reply_to_message.sticker.is_video:
-            type_ = "webm"
-            sticker_name = "VideoStickers"
-            sticker_limit = 50
-            down_ = await m.reply_to_message.download()
-            file_ = await Altruix.bot.upload_doc(down_, peer_, force_file=True)
-        else:
-            type_ = ""
-            sticker_name = ""
-            sticker_limit = 120
-            file_ = await decode_file_id(m.reply_to_message.sticker.file_id)
+    if not Altruix.bot or not getattr(Altruix, "bot_info", None):
+        return await msg.edit_msg("❌ Assistant bot is not active. Please set <code>BOT_TOKEN</code> to use kang.")
+
+    user_id = m.sender_id or (getattr(m.from_user, "id", None) if m.from_user else getattr(c.myself, "id", 0))
+    bot_username = getattr(Altruix.bot_info, "username", "AssistantBot")
+
+    if user_id in cached_peer:
+        peer_ = cached_peer.get(user_id)
     else:
-        return await msg.edit_msg("INVALID_REPLY")
-    sticker = raw.types.InputStickerSetItem(document=file_, emoji=emoji)
-    my_name = (
-        f"@{m.from_user.username}"
-        if m.from_user.username
-        else f"{m.from_user.first_name}"
-    )
-    while True:
-        pack_ += 1
-        pack_m = f"altruix_{m.from_user.id}" + (
-            f"_{sticker_name.lower()}" if sticker_name != "" else ""
-        )
-        pack_m += f"_{pack_}_by_{Altruix.bot_info.username}"
-        title = f"{my_name}'s " + (
-            f"{sticker_name.title()} " if sticker_name != "" else ""
-        )
-        title += f"Pack Vol {pack_}"
-        stick_ = await getstickerfromcollection(pack_m)
-        if not stick_:
-            stick_ = await Altruix.bot.invoke(
-                raw.functions.stickers.CreateStickerSet(
-                    user_id=peer_,
-                    title=title,
-                    short_name=pack_m,
-                    stickers=[sticker],
-                    animated=type_ == "tgs",
-                    videos=type_ == "webm",
+        try:
+            peer_ = await Altruix.bot.resolve_peer(user_id)
+        except Exception:
+            try:
+                bot_entity = await c.get_entity(bot_username)
+                await c.send_message(bot_entity, "/start")
+                await asyncio.sleep(1)
+                peer_ = await Altruix.bot.resolve_peer(user_id)
+            except Exception:
+                return await msg.edit_msg(
+                    "START_YOUR_ASSISTANT", string_args=(bot_username)
                 )
+        cached_peer[user_id] = peer_
+
+    rm = m.reply_to_message or (await m.get_reply_message() if hasattr(m, "get_reply_message") else None)
+    if not rm:
+        return await msg.edit_msg("INVALID_REPLY")
+
+    user_input = m.user_input.strip() if m.user_input else ""
+    emoji = user_input or "😁"
+
+    # Identify media type
+    doc = getattr(rm.media, "document", None) or getattr(rm, "document", None)
+    is_sticker = bool(getattr(rm, "sticker", None)) or (
+        bool(doc) and any(
+            isinstance(attr, types.DocumentAttributeSticker)
+            for attr in getattr(doc, "attributes", [])
+        )
+    )
+
+    # Auto-extract sticker emoji if not manually specified
+    if is_sticker and not user_input and doc:
+        for attr in getattr(doc, "attributes", []):
+            if isinstance(attr, types.DocumentAttributeSticker) and attr.alt:
+                emoji = attr.alt
+                break
+
+    temp_cleanup_files = []
+    file_ = None
+
+    try:
+        # CASE 1: Replied message is ALREADY A STICKER (Static, Animated, or Video)
+        # MTProto allows passing the existing InputDocument directly without re-uploading or FFmpeg!
+        if is_sticker and doc:
+            file_ = types.InputDocument(
+                id=doc.id,
+                access_hash=doc.access_hash,
+                file_reference=doc.file_reference,
             )
 
-            break
-        elif stick_.set.count and stick_.set.count >= sticker_limit:
-            await msg.edit_msg("MAX_STICKER_DONE", string_args=(title, pack_ + 1))
-            continue
-        else:
-            await Altruix.bot.invoke(
-                raw.functions.stickers.AddStickerToSet(
-                    stickerset=raw.types.InputStickerSetShortName(
-                        short_name=stick_.set.short_name
-                    ),
-                    sticker=sticker,
+        # CASE 2: Replied message is a PHOTO or static IMAGE DOCUMENT
+        elif (
+            rm.photo
+            or (rm.document and getattr(rm, "file", None) and getattr(rm.file, "mime_type", "").startswith("image/"))
+        ):
+            temp_dl = os.path.join(TEMP_DIR, f"raw_photo_{int(time.time() * 1000)}.jpg")
+            photo_path = await c.download_media(rm, file=temp_dl)
+            if not photo_path or not os.path.exists(photo_path):
+                return await msg.edit_msg("Failed to download image from replied message.")
+            temp_cleanup_files.append(photo_path)
+            resized = await resize_image(photo_path)
+            temp_cleanup_files.append(resized)
+            file_ = await Altruix.bot.upload_doc(resized, peer_)
+
+        # CASE 3: Replied message is a raw non-sticker VIDEO or GIF
+        elif rm.video or (rm.document and getattr(rm, "file", None) and getattr(rm.file, "mime_type", "").startswith("video/")):
+            if not shutil.which("ffmpeg"):
+                return await msg.edit_msg(
+                    "❌ <b>FFmpeg is required</b> to convert raw videos/GIFs into video stickers.\n\n"
+                    "<i>Note: You can already kang any existing sticker (animated, video, or static) directly without FFmpeg!</i>"
                 )
+            temp_vid = os.path.join(TEMP_DIR, f"raw_vid_{int(time.time() * 1000)}.mp4")
+            dl_path = await c.download_media(rm, file=temp_vid)
+            if not dl_path or not os.path.exists(dl_path):
+                return await msg.edit_msg("Failed to download video file.")
+            temp_cleanup_files.append(dl_path)
+            converted = await convert_(dl_path)
+            temp_cleanup_files.append(converted)
+            file_ = await Altruix.bot.upload_doc(converted, peer_, force_file=True)
+
+        elif doc:
+            file_ = types.InputDocument(
+                id=doc.id,
+                access_hash=doc.access_hash,
+                file_reference=doc.file_reference,
             )
-        break
-    pack_m = f"https://t.me/addstickers/{pack_m}"
-    await msg.edit_msg("STICKER_KANGED", string_args=(pack_m, title))
+        else:
+            return await msg.edit_msg("❌ <b>Unsupported media.</b> Please reply to a sticker, photo, image, or video.")
+
+        sticker = types.InputStickerSetItem(document=file_, emoji=emoji)
+
+        from_user = m.from_user
+        username = getattr(from_user, "username", None) if from_user else getattr(c.myself, "username", None)
+        first_name = getattr(from_user, "first_name", None) if from_user else getattr(c.myself, "first_name", "User")
+        my_name = f"@{username}" if username else f"{first_name}"
+        user_num_id = user_id or getattr(c.myself, "id", 0)
+
+        # Telegram supports mixed sticker sets (static, animated, and video in the same pack)
+        sticker_limit = 120
+        pack_ = 0
+
+        while True:
+            pack_ += 1
+            pack_m = f"altruix_{user_num_id}_{pack_}_by_{bot_username}"
+            title = f"{my_name}'s Pack Vol {pack_}"
+
+            stick_ = await getstickerfromcollection(pack_m)
+            if not stick_:
+                await Altruix.bot.invoke(
+                    functions.stickers.CreateStickerSetRequest(
+                        user_id=utils.get_input_user(peer_),
+                        title=title,
+                        short_name=pack_m,
+                        stickers=[sticker],
+                    )
+                )
+                break
+            count_val = getattr(getattr(stick_, "set", None), "count", None)
+            if isinstance(count_val, int) and count_val >= sticker_limit:
+                continue
+            else:
+                try:
+                    await Altruix.bot.invoke(
+                        functions.stickers.AddStickerToSetRequest(
+                            stickerset=types.InputStickerSetShortName(
+                                short_name=stick_.set.short_name
+                            ),
+                            sticker=sticker,
+                        )
+                    )
+                    break
+                except (
+                    errors.StickersTooMuchError,
+                    errors.StickerpackStickersTooMuchError,
+                    errors.StickerPngNopngError,
+                    errors.StickerTgsNotgsError,
+                    errors.StickerVideoNowebmError,
+                ):
+                    # If older pack cannot accept this type or reached limit, advance to next volume
+                    continue
+
+        pack_url = f"https://t.me/addstickers/{pack_m}"
+        await msg.edit_msg("STICKER_KANGED", string_args=(pack_url, title))
+
+    finally:
+        for f in temp_cleanup_files:
+            if os.path.exists(f):
+                with suppress_error(msg="Cleaning up temporary sticker file"):
+                    os.remove(f)
 
 
 @Altruix.register_on_cmd(
     ["stickerpacks", "sp", "msp"],
     cmd_help={
-        "help": "get all your packs that you have kanged.",
-        "example": "sp -animated",
-        "_args": {"animated": "Show animated packs", "vs": "Show video stickers"},
+        "help": "Get all your sticker packs that you have kanged.",
+        "example": "sp",
     },
 )
 async def get_pack_(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
-    if "-animated" in m.user_args:
-        type_ = "Animated"
-    elif "-vs" in m.user_args:
-        type_ = "VideoStickers"
-    else:
-        type_ = ""
-    str_type = f"{type_} " if type_ != "" else type_
-    final_text = f"<b>Your {str_type}" + "Sticker Packs :</b> \n"
+    final_text = "<b>Your Sticker Packs:</b>\n"
     pack_ = 0
+    from_user = m.from_user
+    username = getattr(from_user, "username", None) if from_user else getattr(c.myself, "username", None)
+    first_name = getattr(from_user, "first_name", None) if from_user else getattr(c.myself, "first_name", "User")
+    my_name = f"@{username}" if username else f"{first_name}"
+    user_num_id = getattr(from_user, "id", None) or m.sender_id or getattr(c.myself, "id", 0)
+    bot_username = getattr(Altruix.bot_info, "username", "AssistantBot") if Altruix.bot_info else "AssistantBot"
+
+    found_any = False
     while True:
         pack_ += 1
-        my_name = (
-            f"@{m.from_user.username}"
-            if m.from_user.username
-            else f"{m.from_user.first_name}"
-        )
-        pack_m = f"altruix_{str(m.from_user.id)}" + (
-            f"_{type_.lower()}" if type_ != "" else ""
-        )
-        pack_m += f"_{pack_}_by_{Altruix.bot_info.username}"
-        title = f"{my_name}'s " + (f"{type_.title()} " if type_ != "" else "")
-        title += f"Pack Vol {pack_}"
+        pack_m = f"altruix_{user_num_id}_{pack_}_by_{bot_username}"
+        title = f"{my_name}'s Pack Vol {pack_}"
         stick_ = await getstickerfromcollection(pack_m)
-        if pack_ == 1 and not stick_:
-            final_text = None
+        if not stick_:
+            # Also check legacy named packs
+            stick_legacy = await getstickerfromcollection(f"altruix_{user_num_id}_animated_{pack_}_by_{bot_username}")
+            if stick_legacy:
+                stick_ = stick_legacy
+                pack_m = f"altruix_{user_num_id}_animated_{pack_}_by_{bot_username}"
+                title = f"{my_name}'s Animated Pack Vol {pack_}"
+
+        if not stick_:
             break
-        if stick_:
-            no_of_stickers = stick_.set.count
-            pack_url = f"https://t.me/addstickers/{pack_m}"
-            final_text += f"\n✪ <a href='{pack_url}'>{title}</a> [Sticker Count : {no_of_stickers}]"
-            continue
-        break
-    if final_text is None:
+
+        found_any = True
+        no_of_stickers = stick_.set.count
+        pack_url = f"https://t.me/addstickers/{pack_m}"
+        final_text += f"\n✪ <a href='{pack_url}'>{title}</a> [Stickers: <code>{no_of_stickers}</code>]"
+
+    if not found_any:
         return await msg.edit_msg("NO_PACKS_FOUND")
     await msg.edit_msg(final_text)

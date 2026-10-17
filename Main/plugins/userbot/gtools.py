@@ -10,8 +10,8 @@ import time
 import logging
 from Main import Altruix
 from functools import wraps
-from pyrogram import Client, filters
-from Main.core.types.message import Message
+from Main.core.types import AltruixTelegramClient as Client, Message
+from Main.utils.custom_filters import Filters as filters
 from Main.plugins.userbot.channel_utils import digit_wrap
 
 

@@ -7,23 +7,27 @@
 # All rights reserved.
 
 __all__ = ["Essentials"]
+
 import re
 import time
 import asyncio
 import markdown
+import logging
 from bs4 import BeautifulSoup
-from pyrogram.errors.exceptions import FloodWait, MessageNotModified
+from telethon import errors
+from typing import Union
+
+logger = logging.getLogger("altruix.essentials")
 
 
 class _Essentials:
     def __init__(self):
-        # virgin check, don't ask me what this is for :walks:
         self.initialized = True
 
     @staticmethod
     def md_to_text(raw_text: str) -> str:
-        html = markdown.markdown(raw_text)
-        soup = BeautifulSoup(html, features="html.parser")
+        html_content = markdown.markdown(raw_text)
+        soup = BeautifulSoup(html_content, features="html.parser")
         return soup.get_text()
 
     @staticmethod
@@ -32,6 +36,7 @@ class _Essentials:
 
     @staticmethod
     def get_readable_time(seconds: int) -> str:
+        seconds = int(seconds)
         count = 0
         ping_time = ""
         time_list = []
@@ -39,15 +44,9 @@ class _Essentials:
         while count < 4:
             count += 1
             remainder, result = (
-                divmod(
-                    seconds,
-                    60,
-                )
+                divmod(seconds, 60)
                 if count < 3
-                else divmod(
-                    seconds,
-                    24,
-                )
+                else divmod(seconds, 24)
             )
             if seconds == 0 and remainder == 0:
                 break
@@ -59,18 +58,19 @@ class _Essentials:
             ping_time += f"{time_list.pop()}, "
         time_list.reverse()
         ping_time += ":".join(time_list)
-        return ping_time
+        return ping_time or "0s"
 
-    def humanbytes(self, size):
+    def humanbytes(self, size: Union[int, float]) -> str:
         if not size:
-            return ""
+            return "0 B"
         power = 2**10
         raised_to_pow = 0
-        dict_power_n = {0: "", 1: "KB", 2: "MB", 3: "GB", 4: "TB"}
-        while size > power:
-            size /= power
+        dict_power_n = {0: "B", 1: "KB", 2: "MB", 3: "GB", 4: "TB"}
+        size_f = float(size)
+        while size_f >= power and raised_to_pow < 4:
+            size_f /= power
             raised_to_pow += 1
-        return f"{str(round(size, 2))} {dict_power_n[raised_to_pow]}"
+        return f"{round(size_f, 2)} {dict_power_n[raised_to_pow]}"
 
     def time_formatter(self, milliseconds: int) -> str:
         seconds, milliseconds = divmod(milliseconds, 1000)
@@ -84,44 +84,43 @@ class _Essentials:
             + (f"{str(seconds)} Second(s), " if seconds else "")
             + (f"{str(milliseconds)} Millisecond(s), " if milliseconds else "")
         )
-
-        return tmp[:-2]
+        return tmp[:-2] if tmp else "0s"
 
     async def progress(
         self, current, total, upload_or_download, start, message, file_name=None
     ):
-        """Progress Bar For Showing Progress While Uploading / Downloading File - Normal"""
+        """Progress Bar For Showing Progress While Uploading / Downloading File"""
         now = time.time()
         diff = now - start
-        if round(diff % 10.00) == 0 or current == total:
-            percentage = current * 100 / total
-            speed = current / diff
+        if diff < 0.1:
+            return
+        if round(diff % 5.0) == 0 or current == total:
+            percentage = current * 100 / total if total else 0
+            speed = current / diff if diff > 0 else 0
             elapsed_time = round(diff) * 1000
-            if elapsed_time == 0:
-                ...
-            else:
-                time_to_completion = round((total - current) / speed) * 1000
-                estimated_total_time = elapsed_time + time_to_completion
-                try:
-                    await message.edit_msg(
-                        "PROGRESS",
-                        string_args=(
-                            upload_or_download.upper(),
-                            file_name or "Unknown",
-                            upload_or_download.upper(),
-                            self.humanbytes(current),
-                            self.humanbytes(total),
-                            percentage,
-                            self.humanbytes(round(speed)),
-                            self.time_formatter(estimated_total_time),
-                        ),
-                    )
-
-                except FloodWait as e:
-                    await asyncio.sleep(e.x + 2)
-                    message._client.log(f"Sleeping for : {e.value} due to floodwaits!")
-                except MessageNotModified:
-                    pass
+            time_to_completion = round((total - current) / speed) * 1000 if speed > 0 else 0
+            estimated_total_time = elapsed_time + time_to_completion
+            try:
+                await message.edit_msg(
+                    "PROGRESS",
+                    string_args=(
+                        str(upload_or_download).upper(),
+                        file_name or "Unknown",
+                        str(upload_or_download).upper(),
+                        self.humanbytes(current),
+                        self.humanbytes(total),
+                        percentage,
+                        self.humanbytes(round(speed)),
+                        self.time_formatter(estimated_total_time),
+                    ),
+                )
+            except errors.FloodWaitError as e:
+                logger.warning(f"Sleeping for {e.seconds}s due to floodwait")
+                await asyncio.sleep(e.seconds + 2)
+            except errors.MessageNotModifiedError:
+                pass
+            except Exception:
+                pass
 
 
 Essentials = _Essentials()

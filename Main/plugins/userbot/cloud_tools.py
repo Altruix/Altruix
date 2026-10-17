@@ -6,18 +6,23 @@
 #
 # All rights reserved.
 
-from Main import Altruix
-from style import bullets
-from pyrogram import Client
+import traceback
 from os.path import isdir, exists, isfile
-from ...utils.essentials import Essentials
-from Main.core.types.message import Message
 from os import stat, rmdir, remove as rm, listdir as ls
 
+from Main import Altruix
+from Main.core.types import AltruixTelegramClient as Client
+from Main.core.types.message import Message
+from Main.utils.essentials import Essentials
 
-b1 = bullets["bullet1"]
-b2 = bullets["bullet2"]
-b3 = bullets["bullet3"]
+try:
+    from style import bullets
+except ImportError:
+    bullets = {}
+
+b1 = bullets.get("bullet1", ">")
+b2 = bullets.get("bullet2", "•")
+b3 = bullets.get("bullet3", "⋟")
 
 
 def readable(data):
@@ -43,23 +48,21 @@ async def listdir_cmd_handler(c: Client, m: Message):
             return await msg.edit(
                 f"<code>{input_}</code> <b>is a file not a directory.</b>"
             )
+    target_dir = input_ or "."
     files = []
     folders = []
-    lists = sorted(ls(input_))
+    lists = sorted(ls(target_dir))
     length = len(lists)
     if length == 0:
-        return await msg.edit(f"<code>{input_}</code> <b>is an empty folder.</b>")
+        return await msg.edit(f"<code>{target_dir}</code> <b>is an empty folder.</b>")
     for i in lists:
-        j = i
-        if input_:
-            j = f"{input_}/{i}"
+        j = f"{target_dir}/{i}"
         if isdir(j):
             folders.append(f"<code>  {b1} {i}</code>")
         if isfile(j):
             files.append(f"<code>  {b2} {i} ({readable(stat(j).st_size)})</code>")
-    if not input_:
-        input_ = "Altruix"
-    output_ = f"<b>Files and Folders in</b> <code>{input_}</code> (<code>{length}</code>) <b>are :</b> \n\n"
+    disp_name = input_ or "current directory"
+    output_ = f"<b>Files and Folders in</b> <code>{disp_name}</code> (<code>{length}</code>) <b>are :</b> \n\n"
     output_ += (
         f"<code>{b3}</code> <i><b>Folders</b></i> (<code>{len(folders)}</code>):\n"
     )
@@ -72,7 +75,7 @@ async def listdir_cmd_handler(c: Client, m: Message):
         output_ += (
             f"\n\n<b>Note:</b> <code>{input_}</code> <b>is a parent directory.</b>"
         )
-    await msg.edit(f"{output_}")
+    await msg.edit_msg(f"{output_}")
 
 
 @Altruix.register_on_cmd(
@@ -99,6 +102,9 @@ async def remove_cmd_handler(c: Client, m: Message):
     msg = await m.handle_message("PROCESSING")
     input_ = m.raw_user_input
     u_input = m.user_input
+    target_check = (u_input or input_ or "").strip().rstrip("\\/").lower()
+    if not target_check or target_check in ("/", "\\", "c:", "c:\\", "c:/", ".", "..") or len(target_check) <= 2:
+        return await msg.edit("❌ <b>Security Violation:</b> <code>Cannot delete root or parent filesystem directories.</code>")
     if user_args := m.user_args:
         if "d" in user_args:
             try:

@@ -1,41 +1,27 @@
-name: DummyDeploy
+name: Tests
 on:
   push:
     paths:
-    - "**.py"
+      - "**.py"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "uv.lock"
+      - ".github/workflows/test_run.yml"
+  pull_request:
   workflow_dispatch:
-env:
-  API_ID: "${{ secrets.API_ID }}"
-  API_HASH: "${{ secrets.API_HASH }}"
-  SESSIONS: "${{ secrets.SESSION }}"
-  BOT_TOKEN: "${{ secrets.BOT_TOKEN }}"
-  DB_URI: "${{ secrets.DB_URI }}"
-  COMMIT_NAME: "${{ github.event.head_commit.message }}"
-  COMMIT_SHA: "${{ github.sha }}"
-  OWNER_ID: "919209968"
-  SUDO_USERS: "919209968 5097667829"
-  ALIVE_MEDIA: "https://wallpapercave.com/wp/wp4790761.jpg"
-  DEBUG: true
 jobs:
   testRun:
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, 'auto: format / refactor')"
     steps:
-      - name: Init
-        uses: actions/checkout@v3
-        with:
-          token: ${{ github.token }}
-      - name: "Cancelling duplicate workflow runs"
-        uses: styfle/cancel-workflow-action@0.9.0
-        with:
-          all_but_latest: true
-          access_token: ${{ github.token }}
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.9
-      - name: Install mandatory dependencies
-        run: pip install -r requirements.txt
-      - name: "Test run the bot"
-        run: |
-          python -m tests
+          python-version: "3.11"
+          cache: pip
+      - name: Install project and test dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Run test suite
+        run: python -m pytest -q

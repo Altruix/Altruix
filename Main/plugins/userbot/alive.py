@@ -6,12 +6,11 @@
 #
 # All rights reserved.
 
-
 import os
 import glob
 import time
 from Main import Altruix
-from pyrogram import Client
+from Main.core.types.client import AltruixTelegramClient as Client
 from Main.core.types.message import Message
 from Main.utils.essentials import Essentials
 
@@ -24,10 +23,11 @@ async def alive(c: Client, m: Message):
     version = Altruix.__version__
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
     path_ = "./cache/alive.*"
-    file = glob.glob(path_)[0] if glob.glob(path_) else ""
+    files = glob.glob(path_)
+    file = files[0] if files else ""
+    template = Altruix.get_string("ALIVE_TEXT") or "<b>Altruix Userbot (Telethon) is Alive!</b>\nVersion: <code>{0}</code>\nUptime: <code>{1}</code>"
+    text = template.format(version, uptime)
     if os.path.exists(file):
-        await m.reply_file(
-            file, caption=Altruix.get_string("ALIVE_TEXT").format(version, uptime)
-        )
+        await m.reply_file(file, caption=text)
         return await m.delete_if_self()
-    await m.handle_message(Altruix.get_string("ALIVE_TEXT").format(version, uptime))
+    await m.handle_message(text)

@@ -6,16 +6,15 @@
 #
 # All rights reserved.
 
-
 import time
-import contextlib
+import asyncio
 from Main import Altruix
-from pyrogram.client import Client
-from ..core.decorators import check_perm
+from Main.utils.suppress import suppress_error
+from Main.core.types.client import AltruixTelegramClient as Client
+from Main.core.decorators import check_perm
 from Main.core.types.message import Message
-from pyrogram.errors import UserAdminInvalid
 from Main.plugins.userbot.channel_utils import digit_wrap
-from pyrogram.types import ChatPrivileges, ChatPermissions
+from telethon import errors
 
 
 @Altruix.register_on_cmd(
@@ -29,7 +28,7 @@ async def pin(c: Client, msg: Message):
     try:
         await c.pin_chat_message(msg.chat.id, msg.reply_to_message.id)
     except Exception as exception_:
-        return await _m.edit_msg("UNABLE_TO_PIN", string_args=(exception_))
+        return await _m.edit_msg("UNABLE_TO_PIN", string_args=(exception_,))
     await _m.edit_msg("PINNED")
 
 
@@ -47,14 +46,14 @@ async def unpin(c: Client, msg: Message):
     try:
         await c.unpin_chat_message(msg.chat.id, msg.reply_to_message.id)
     except Exception as exception_:
-        return await m.edit_msg("UNABLE_TO_UNPIN", string_args=(exception_))
+        return await m.edit_msg("UNABLE_TO_UNPIN", string_args=(exception_,))
     await m.edit_msg("UNPINNED")
 
 
 @Altruix.register_on_cmd(
     "ban",
     cmd_help={
-        "help": "Ban the user from the chat and restrict his permissions",
+        "help": "Ban the user from the chat and restrict permissions",
         "example": "ban (reply|username|id)",
     },
     group_only=True,
@@ -67,16 +66,17 @@ async def ban(c: Client, m: Message):
         return await ms.edit_msg("INVALID_USER")
     dur, input_dur = m.extract_time
     try:
-        u_ = await m.chat.ban_member(digit_wrap(user_), until_date=dur)
-    except UserAdminInvalid:
+        await c.edit_permissions(m.chat.id, digit_wrap(user_), view_messages=False, until_date=dur)
+    except errors.UserAdminInvalidError:
         return await ms.edit_msg("NOT_PROPER_RIGHTS")
     except Exception as exception_:
-        return await ms.edit_msg("UNABLE_TO_BAN", string_args=(exception_))
+        return await ms.edit_msg("UNABLE_TO_BAN", string_args=(exception_,))
     input_dur = input_dur or "Forever"
+    user_obj = await c.get_users(user_)
     await ms.edit_msg(
         "BANNED_USER",
         string_args=(
-            u_.left_chat_member.mention,
+            getattr(user_obj, "mention", str(user_)),
             reason_ or "Not specified",
             input_dur,
         ),
@@ -86,7 +86,7 @@ async def ban(c: Client, m: Message):
 @Altruix.register_on_cmd(
     "unban",
     cmd_help={
-        "help": "Unban a user from the chat and restore his permissions",
+        "help": "Unban a user from the chat and restore permissions",
         "example": "unban (reply|username|id)",
     },
     group_only=True,
@@ -98,19 +98,19 @@ async def unban(c: Client, m: Message):
     if not user_:
         return await ms.edit_msg("INVALID_USER")
     try:
-        await m.chat.unban_member(digit_wrap(user_))
-    except UserAdminInvalid:
+        await c.edit_permissions(m.chat.id, digit_wrap(user_), view_messages=True)
+    except errors.UserAdminInvalidError:
         return await ms.edit_msg("NOT_PROPER_RIGHTS")
     except Exception as exception_:
-        return await ms.edit_msg("UNABLE_TO_BAN", string_args=(exception_))
+        return await ms.edit_msg("UNABLE_TO_BAN", string_args=(exception_,))
     u_ser = await c.get_users(user_)
-    await ms.edit_msg("UNBANNED_USER", string_args=(u_ser.mention))
+    await ms.edit_msg("UNBANNED_USER", string_args=(getattr(u_ser, "mention", str(user_)),))
 
 
 @Altruix.register_on_cmd(
     "mute",
     cmd_help={
-        "help": "Disallow a user to send message in the chat",
+        "help": "Disallow a user to send messages in the chat",
         "example": "mute (reply|username|id)",
     },
     group_only=True,
@@ -123,23 +123,18 @@ async def mute(c: Client, m: Message):
         return await ms.edit_msg("INVALID_USER")
     dur, input_dur = m.extract_time
     try:
-        await c.restrict_chat_member(
-            m.chat.id,
-            digit_wrap(user_),
-            ChatPermissions(can_send_messages=False),
-            until_date=dur,
-        )
-    except UserAdminInvalid:
-        return await ms.edit_msg(Altruix.get_string("NOT_PROPER_RIGHTS"))
+        await c.edit_permissions(m.chat.id, digit_wrap(user_), send_messages=False, until_date=dur)
+    except errors.UserAdminInvalidError:
+        return await ms.edit_msg(Altruix.get_string("NOT_PROPER_RIGHTS") or "Not proper admin rights.")
     except Exception as exception_:
         return await ms.edit_msg(
-            Altruix.get_string("UNABLE_TO_MUTE").format(exception_)
+            Altruix.get_string("UNABLE_TO_MUTE", string_args=(exception_,)) or f"Unable to mute: {exception_}"
         )
     user_info = await c.get_users(user_)
     input_dur = input_dur or "Forever"
     await ms.edit_msg(
         "MUTED_USER",
-        string_args=(user_info.mention, reason_ or "Not specified", input_dur),
+        string_args=(getattr(user_info, "mention", str(user_)), reason_ or "Not specified", input_dur),
     )
 
 
@@ -155,24 +150,22 @@ async def mute(c: Client, m: Message):
 async def unmute(c: Client, m: Message):
     ms = await m.handle_message("PROCESSING")
     user_, reason_, is_chnnl = m.get_user
-    if not user_ or not is_chnnl:
+    if not user_:
         return await ms.edit_msg("INVALID_USER")
     try:
-        await c.restrict_chat_member(
-            m.chat.id, digit_wrap(user_), ChatPermissions(can_send_messages=True)
-        )
-    except UserAdminInvalid:
+        await c.edit_permissions(m.chat.id, digit_wrap(user_), send_messages=True)
+    except errors.UserAdminInvalidError:
         return await ms.edit_msg("NOT_PROPER_RIGHTS")
     except Exception as exception_:
-        return await ms.edit_msg("UNABLE_TO_UNMUTE", string_args=(exception_))
+        return await ms.edit_msg("UNABLE_TO_UNMUTE", string_args=(exception_,))
     user_info = await c.get_users(user_)
-    await m.edit_msg("UNMUTED_USER", string_args=(user_info.mention))
+    await ms.edit_msg("UNMUTED_USER", string_args=(getattr(user_info, "mention", str(user_)),))
 
 
 @Altruix.register_on_cmd(
     "kick",
     cmd_help={
-        "help": "Kick the user from the chat, He can join back if wanted",
+        "help": "Kick the user from the chat",
         "example": "kick (reply|username|id)",
     },
     group_only=True,
@@ -184,114 +177,23 @@ async def kick(c: Client, m: Message):
     if not user_:
         return await ms.edit_msg("INVALID_USER")
     try:
-        u_ = await m.chat.ban_member(digit_wrap(user_))
-        await m.chat.unban_member(digit_wrap(user_))
-    except UserAdminInvalid:
+        await c.kick_participant(m.chat.id, digit_wrap(user_))
+    except errors.UserAdminInvalidError:
         return await ms.edit_msg("NOT_PROPER_RIGHTS")
     except Exception as exception_:
-        return await ms.edit_msg("UNABLE_TO_KICK", string_args=(exception_))
-    await ms.edit_msg("ALREADY_KICKED") if u_ is True else await ms.edit_msg(
+        return await ms.edit_msg("UNABLE_TO_KICK", string_args=(exception_,))
+    user_info = await c.get_users(user_)
+    await ms.edit_msg(
         "KICKED_USER",
-        string_args=(u_.left_chat_member.mention, reason_ or "Not specified"),
+        string_args=(getattr(user_info, "mention", str(user_)), reason_ or "Not specified"),
     )
 
 
 @Altruix.register_on_cmd(
     "promote",
     cmd_help={
-        "help": "promote a user in the group chat with specific permissions.",
+        "help": "Promote a user in the group chat",
         "example": "promote (username | reply to user)",
-        "user_args": [
-            {
-                "arg": "perms",
-                "help": "It can be (cci/cdm/ciu/cpm/cprm/cmvc/anon) separated by space.",
-                "requires_input": True,
-            },
-            {
-                "arg": "title",
-                "help": "Admin title. Defaults to 'Admin'",
-                "requires_input": True,
-            },
-        ],
-    },
-    group_only=True,
-    disallow_if_sender_is_channel=True,
-)
-@check_perm("can_promote_members", return_perm=True)
-async def promote(c: Client, m: Message, my_perms: ChatPermissions):
-    ms = await m.handle_message("PROCESSING")
-    user_, __, _ = m.get_user
-    args = m.user_args
-
-    can_change_info = False
-    can_delete_messages = False
-    can_invite_users = False
-    can_pin_messages = False
-    can_promote_members = False
-    can_restrict_members = False
-    can_manage_chat = False
-    can_manage_video_chats = False
-    admin_title = arg.title or "Admin"
-    if not args:
-        can_change_info = my_perms["can_change_info"]
-        can_delete_messages = my_perms["can_delete_messages"]
-        can_invite_users = my_perms["can_invite_users"]
-        can_pin_messages = my_perms["can_pin_messages"]
-        can_promote_members = my_perms["can_promote_members"]
-        can_restrict_members = my_perms["can_restrict_members"]
-        can_manage_chat = my_perms["can_manage_chat"]
-        can_manage_video_chats = my_perms["can_manage_voice_chats"]
-    else:
-        for arg in args:
-            if arg.key.lower() == "cci":
-                can_change_info = True
-            if arg.key.lower() == "cdm":
-                can_delete_messages = True
-            if arg.key.lower() == "ciu":
-                can_invite_users = True
-            if arg.key.lower() == "cpm":
-                can_pin_messages = True
-            if arg.key.lower() == "pro":
-                can_promote_members = True
-            if arg.key.lower() == "crm":
-                can_restrict_members = True
-            if arg.key.lower() == "cmc":
-                can_manage_chat = True
-            if arg.key.lower() == "cmvc":
-                can_manage_video_chats = True
-            if arg.key.lower() == "anon":
-                is_anonymous = True
-    permissions = ChatPrivileges(
-        can_change_info=can_change_info,
-        can_delete_messages=can_delete_messages,
-        can_invite_users=can_invite_users,
-        can_pin_messages=can_pin_messages,
-        can_promote_members=can_promote_members,
-        can_restrict_members=can_restrict_members,
-        can_manage_chat=can_manage_chat,
-        can_manage_video_chats=can_manage_video_chats,
-        is_anonymous=is_anonymous,
-    )
-    if not user_:
-        return await ms.edit_msg("INVALID_USER")
-    try:
-        await c.promote_chat_member(
-            m.chat.id, digit_wrap(user_), privileges=permissions
-        )
-    except Exception as e:
-        return await ms.edit_msg("PROMOTE_FAILED", string_args=(e))
-    if admin_title and m.chat.type == "supergroup":
-        with contextlib.suppress(Exception):
-            await c.set_administrator_title(m.chat.id, user_, admin_title)
-    user_info = await c.get_users(user_)
-    await ms.edit_msg("PROMOTED", string_args=(user_info.mention, admin_title))
-
-
-@Altruix.register_on_cmd(
-    "demote",
-    cmd_help={
-        "help": "demote a user in the group chat",
-        "example": "demote (username | reply to user)",
     },
     group_only=True,
     disallow_if_sender_is_channel=True,
@@ -299,30 +201,54 @@ async def promote(c: Client, m: Message, my_perms: ChatPermissions):
 @check_perm("can_promote_members")
 async def promote(c: Client, m: Message):
     ms = await m.handle_message("PROCESSING")
+    user_, __, _ = m.get_user
+    args = m.user_args
+    if not user_:
+        return await ms.edit_msg("INVALID_USER")
+
+    admin_title = args.title or "Admin"
+    try:
+        await c.edit_admin(
+            m.chat.id,
+            digit_wrap(user_),
+            change_info=True,
+            post_messages=True,
+            edit_messages=True,
+            delete_messages=True,
+            ban_users=True,
+            invite_users=True,
+            pin_messages=True,
+            add_admins=False,
+            manage_call=True,
+            title=admin_title,
+        )
+    except Exception as e:
+        return await ms.edit_msg("PROMOTE_FAILED", string_args=(e,))
+    user_info = await c.get_users(user_)
+    await ms.edit_msg("PROMOTED", string_args=(getattr(user_info, "mention", str(user_)), admin_title))
+
+
+@Altruix.register_on_cmd(
+    "demote",
+    cmd_help={
+        "help": "Demote a user in the group chat",
+        "example": "demote (username | reply to user)",
+    },
+    group_only=True,
+    disallow_if_sender_is_channel=True,
+)
+@check_perm("can_promote_members")
+async def demote(c: Client, m: Message):
+    ms = await m.handle_message("PROCESSING")
     user_, a_title, is_chnnl = m.get_user
     if not user_:
         return await ms.edit_msg("INVALID_USER")
     try:
-        await c.promote_chat_member(
-            m.chat.id,
-            digit_wrap(user_),
-            ChatPrivileges(
-                is_anonymous=False,
-                can_change_info=False,
-                can_edit_messages=False,
-                can_manage_video_chats=False,
-                can_manage_chat=False,
-                can_delete_messages=False,
-                can_restrict_members=False,
-                can_invite_users=False,
-                can_pin_messages=False,
-                can_promote_members=False,
-            ),
-        )
+        await c.edit_admin(m.chat.id, digit_wrap(user_), is_admin=False)
     except Exception as e:
-        return await ms.edit_msg("DEMOTE_FAILED", string_args=(e))
+        return await ms.edit_msg("DEMOTE_FAILED", string_args=(e,))
     user_info = await c.get_users(user_)
-    await ms.edit_msg("DEMOTED", string_args=(user_info.mention))
+    await ms.edit_msg("DEMOTED", string_args=(getattr(user_info, "mention", str(user_)),))
 
 
 @Altruix.register_on_cmd(
@@ -333,21 +259,19 @@ async def promote(c: Client, m: Message):
     },
     requires_reply=True,
 )
-async def delete(c: Client, m: Message):
+async def delete_cmd(c: Client, m: Message):
     start_time = time.time()
     ms = await m.handle_message("PROCESSING")
-    status = await c.delete_messages(
-        chat_id=m.chat.id, message_ids=m.reply_to_message.id
-    )
-    if status:
-        await ms.edit_msg(
-            "DEL_SUCCESS_TRUE",
-            string_args=(round((time.time() - start_time) * 1000, 2)),
-        )
+    reply_id = m.reply_to_message.id if m.reply_to_message else None
+    if reply_id:
+        await c.delete_messages(m.chat.id, [reply_id])
+        elapsed = round((time.time() - start_time) * 1000, 2)
+        await ms.edit_msg("DEL_SUCCESS_TRUE", string_args=(elapsed,))
     else:
         await ms.edit_msg("DEL_SUCCESS_FALSE")
-    time.sleep(3)
-    await ms.delete()
+    await asyncio.sleep(2)
+    with suppress_error(msg="Deleting del status message"):
+        await ms.delete()
 
 
 @Altruix.register_on_cmd(
@@ -362,19 +286,15 @@ async def delete(c: Client, m: Message):
 async def purge(c: Client, m: Message):
     start_time = time.time()
     ms = await m.handle_message("PROCESSING")
-    no_of_msg_purged = 0
-    ids = []
-    for msg_id in range(m.reply_to_message.id, m.id):
-        if msg_id not in [m.id, ms.id]:
-            no_of_msg_purged += 1
-            ids.append(msg_id)
-            if len(ids) >= 100:
-                await c.delete_messages(chat_id=m.chat.id, message_ids=ids, revoke=True)
-                ids.clear()
+    start_id = m.reply_to_message.id
+    end_id = m.id
+    ids = [i for i in range(start_id, end_id) if i not in (m.id, ms.id)]
     if ids:
-        await c.delete_messages(chat_id=m.chat.id, message_ids=ids, revoke=True)
-    end_time = time.time()
-    time_taken = round((end_time - start_time) * 1000, 2)
-    await ms.edit_msg("PURGED", string_args=(time_taken, no_of_msg_purged))
-    time.sleep(3)
-    await ms.delete()
+        # Telethon delete_messages accepts list of message IDs
+        for chunk in [ids[i : i + 100] for i in range(0, len(ids), 100)]:
+            await c.delete_messages(m.chat.id, chunk)
+    time_taken = round((time.time() - start_time) * 1000, 2)
+    await ms.edit_msg("PURGED", string_args=(time_taken, len(ids)))
+    await asyncio.sleep(2)
+    with suppress_error(msg="Deleting purge status message"):
+        await ms.delete()
