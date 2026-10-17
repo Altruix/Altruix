@@ -18,7 +18,24 @@ packages_list = Altruix.db.make_collection("packages") if Altruix.db else None
 
 
 @Altruix.register_on_cmd(
-    ["apm_install", "apm"],
+    ["apm", "apmpanel"],
+    cmd_help={
+        "help": "Open the interactive APM Control Center or install packages.",
+        "example": "apm (opens interactive control panel)\napm https://github.com/...",
+    },
+)
+async def apm_hub_cmd(c, m: Message):
+    if not m.user_input:
+        from Main.utils.inline_helper import send_inline_widget
+        sent = await send_inline_widget(c, m, "apm")
+        if sent:
+            return
+        return await list_packages(c, m)
+    return await install_pack(c, m)
+
+
+@Altruix.register_on_cmd(
+    ["apm_install"],
     cmd_help={
         "example": "apm_install https://github.com/username/XtraPlugins -sub media,lifestyle",
         "help": "Install external plugins with optional subcategory segregation and fast dependency resolution.",

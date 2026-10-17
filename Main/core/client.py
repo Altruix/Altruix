@@ -360,7 +360,7 @@ class AltruixClient:
             self._pending_handlers.append(handler_info)
             for client in self.clients:
                 self._attach_handler_to_client(client, handler_info)
-            if self.bot_mode and not bot_mode_unsupported and self._raw_bot is not None:
+            if not bot_mode_unsupported and self._raw_bot is not None:
                 self._attach_handler_to_client(self._raw_bot, handler_info)
             return func
 
@@ -388,11 +388,14 @@ class AltruixClient:
                     if not raw_text or not isinstance(raw_text, str):
                         return
 
+                    is_bot_client = hasattr(client, "myself") and bool(getattr(client.myself, "bot", False))
+
                     user_p = getattr(self, "user_command_handler", ".") or "."
                     sudo_p = getattr(self, "sudo_cmd_handler", "!") or "!"
 
                     first_char = raw_text[0]
-                    if first_char != user_p and first_char != sudo_p:
+                    valid_prefixes = ("/", user_p, sudo_p) if is_bot_client else (user_p, sudo_p)
+                    if first_char not in valid_prefixes:
                         return
 
                     parts = raw_text.split(None, 1)
@@ -400,31 +403,40 @@ class AltruixClient:
                         return
 
                     prefix = parts[0][0]
-                    cmd_name = parts[0][1:].lower()
+                    cmd_raw = parts[0][1:].lower()
+                    if "@" in cmd_raw:
+                        cmd_name, at_target = cmd_raw.split("@", 1)
+                        if is_bot_client and hasattr(client, "myself") and client.myself:
+                            bot_user = (getattr(client.myself, "username", "") or "").lower()
+                            if at_target != bot_user:
+                                return
+                    else:
+                        cmd_name = cmd_raw
 
                     handler_entry = client._cmd_handlers_map.get(cmd_name)
                     if not handler_entry:
                         return
 
-                    is_self = getattr(event, "out", False)
-                    if not is_self and hasattr(client, "myself") and client.myself:
-                        if getattr(event, "sender_id", None) == client.myself.id:
-                            is_self = True
-
                     sender_id = getattr(event, "sender_id", None)
                     sudo_users = getattr(self.config, "SUDO_USERS", []) or []
 
-                    if prefix == user_p:
-                        if not is_self:
+                    if not is_bot_client:
+                        is_self = getattr(event, "out", False)
+                        if not is_self and hasattr(client, "myself") and client.myself:
+                            if getattr(event, "sender_id", None) == client.myself.id:
+                                is_self = True
+
+                        if prefix == user_p:
+                            if not is_self:
+                                return
+                        elif prefix == sudo_p:
+                            if not sender_id or sender_id not in sudo_users:
+                                return
+                            disabled = getattr(self, "disabled_sudo_plugin_list", []) or []
+                            if isinstance(disabled, (list, tuple, set)) and cmd_name in {str(x).lower() for x in disabled}:
+                                return
+                        else:
                             return
-                    elif prefix == sudo_p:
-                        if not sender_id or sender_id not in sudo_users:
-                            return
-                        disabled = getattr(self, "disabled_sudo_plugin_list", []) or []
-                        if isinstance(disabled, (list, tuple, set)) and cmd_name in {str(x).lower() for x in disabled}:
-                            return
-                    else:
-                        return
 
                     message = enrich_message(event, client)
 
@@ -655,6 +667,9 @@ class AltruixClient:
                 self.log(f"Assistant : Logged in as @{getattr(self.bot_info, 'username', 'Unknown')}")
                 for h_type, cust_filter, func in self._pending_bot_handlers:
                     self._register_bot_handler(h_type, cust_filter, func)
+                for h_info in self._pending_handlers:
+                    if not h_info.get("bot_mode_unsupported"):
+                        self._attach_handler_to_client(self._raw_bot, h_info)
             except Exception as e:
                 self.log(f"Failed to start assistant bot: {e}", level=logging.ERROR)
 
