@@ -7,6 +7,7 @@
 # All rights reserved.
 
 import logging
+from contextlib import suppress
 from typing import Optional, Any
 from Main import Altruix
 
@@ -15,10 +16,10 @@ logger = logging.getLogger("altruix.inline")
 
 def is_inline_available() -> bool:
     """Check if the assistant bot is online, configured, and capable of inline queries."""
-    if not getattr(Altruix, "bot_info", None):
+    if not getattr(Altruix, "bot_info", None) or not getattr(Altruix, "bot", None):
         return False
     username = getattr(Altruix.bot_info, "username", None)
-    return bool(username)
+    return bool(username and isinstance(username, str))
 
 
 async def send_inline_widget(c: Any, m: Any, query: str) -> bool:
@@ -30,20 +31,20 @@ async def send_inline_widget(c: Any, m: Any, query: str) -> bool:
         return False
 
     bot_username = getattr(Altruix.bot_info, "username", None)
-    if not bot_username:
+    if not bot_username or not isinstance(bot_username, str):
         return False
 
-    chat_id = m.chat_id or getattr(m.chat, "id", None)
+    chat_id = getattr(m, "chat_id", None) or getattr(getattr(m, "chat", None), "id", None)
     if not chat_id:
         return False
 
     try:
         results = await c.get_inline_bot_results(bot_username, query)
-        if results and len(results) > 0:
+        if results and isinstance(results, (list, tuple)) and len(results) > 0:
             rm = getattr(m, "reply_to_message", None)
             reply_to = rm.id if rm else m.id
             await results[0].click(chat_id, reply_to=reply_to)
-            with contextlib_suppress():
+            with suppress(Exception):
                 await m.delete_if_self()
             return True
     except Exception as e:

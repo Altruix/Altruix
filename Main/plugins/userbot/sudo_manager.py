@@ -58,6 +58,7 @@ async def disabled_ps_func(c: Client, m: Message):
     await Altruix.config.sync_env_to_db("DISABLED_SUDO_CMD_LIST", input_, push_=True)
     current = getattr(Altruix, "disabled_sudo_plugin_list", [])
     Altruix.disabled_sudo_plugin_list = list(dict.fromkeys([*current, *[x.lower() for x in input_]]))
+    Altruix.prepare_help()
     await msg.edit_msg("DISABLED_SUDO_CMD", string_args=(str(input_),))
 
 
@@ -77,6 +78,7 @@ async def remove_disabled_ps_func(c: Client, m: Message):
         "DISABLED_SUDO_CMD_LIST", input_
     )
     Altruix.disabled_sudo_plugin_list = [str(item).strip().lower() for item in Altruix.disabled_sudo_plugin_list]
+    Altruix.prepare_help()
     await msg.edit_msg("UNDISABLED_SUDO_CMD", string_args=(str(input_),))
 
 
@@ -165,9 +167,37 @@ async def rm_sudo_func(c: Client, m: Message):
 
 
 @Altruix.register_on_cmd(
-    "listsudo", cmd_help={"help": "list all sudo users!", "example": "listsudo"}
+    "listsudo",
+    cmd_help={
+        "help": "list all sudo users!",
+        "example": "listsudo or listsudo -basic",
+        "user_args": [
+            {
+                "arg": "basic",
+                "help": "Force text-based list without inline buttons widget.",
+                "requires_input": False,
+            }
+        ],
+    },
 )
 async def list_sudo_func(c: Client, m: Message):
+    is_bot = (
+        (getattr(c, "myself", None) and getattr(c.myself, "bot", False))
+        or (getattr(Altruix, "bot_info", None) and getattr(c, "myself", None) and c.myself.id == Altruix.bot_info.id)
+    )
+    if is_bot:
+        from Main.plugins.bot.sudo_inline import _render_sudo_menu
+        text, buttons = await _render_sudo_menu(c)
+        return await m.reply(text, buttons=buttons, parse_mode="html")
+
+    if "-basic" not in m.user_args and "-text" not in m.user_args:
+        try:
+            from Main.utils.inline_helper import send_inline_widget
+            if await send_inline_widget(c, m, "listsudo"):
+                return
+        except Exception:
+            pass
+
     msg = await m.handle_message("PROCESSING")
     users_ = await Altruix.config.get_sudo()
     if not users_:

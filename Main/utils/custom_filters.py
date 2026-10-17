@@ -175,11 +175,21 @@ class Filters:
             return True
         return False
 
+    @staticmethod
+    def _outgoing(client: Any, message: Any) -> bool:
+        return bool(getattr(message, "out", False))
+
+    @staticmethod
+    def _incoming(client: Any, message: Any) -> bool:
+        return not bool(getattr(message, "out", False))
+
     private = Filter(_private)
     group = Filter(_group)
     channel = Filter(_channel)
     mentioned = Filter(_mentioned)
     new_chat_members = Filter(_new_chat_members)
+    outgoing = Filter(_outgoing)
+    incoming = Filter(_incoming)
     all = Filter(lambda c, m: True)
     create = staticmethod(create)
 

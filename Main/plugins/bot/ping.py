@@ -33,6 +33,7 @@ async def ping_command_handler(c, m):
 
 @Altruix.bot.on_callback_query(filters.regex(r"^ping"))
 @log_errors
+@iuser_check
 async def ping_cb_handler(c, cb):
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
     start = time.perf_counter()

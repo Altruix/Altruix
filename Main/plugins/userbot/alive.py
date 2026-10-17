@@ -17,9 +17,41 @@ from Main.utils.essentials import Essentials
 
 @Altruix.register_on_cmd(
     "alive",
-    cmd_help={"help": "Checks Alive status of UB", "example": "alive"},
+    cmd_help={
+        "help": "Checks Alive status of UB",
+        "example": "alive or alive -basic",
+        "user_args": [
+            {
+                "arg": "basic",
+                "help": "Force text/media output without inline buttons widget.",
+                "requires_input": False,
+            }
+        ],
+    },
 )
 async def alive(c: Client, m: Message):
+    is_bot = (
+        (getattr(c, "myself", None) and getattr(c.myself, "bot", None) is True)
+        or (
+            getattr(Altruix, "bot_info", None)
+            and getattr(c, "myself", None)
+            and getattr(Altruix.bot_info, "id", None) is not None
+            and getattr(c.myself, "id", None) == Altruix.bot_info.id
+        )
+    )
+    if is_bot:
+        from Main.plugins.bot.alive import _make_alive_content
+        text, buttons = _make_alive_content()
+        return await m.reply(text, buttons=buttons, parse_mode="html")
+
+    if "-basic" not in m.user_args and "-text" not in m.user_args:
+        try:
+            from Main.utils.inline_helper import send_inline_widget
+            if await send_inline_widget(c, m, "alive"):
+                return
+        except Exception:
+            pass
+
     version = Altruix.__version__
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
     path_ = "./cache/alive.*"

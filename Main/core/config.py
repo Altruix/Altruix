@@ -467,3 +467,22 @@ class Config(BaseConfig):
     async def get_pm_sts(self) -> bool:
         val = await self.get_env("PM_PERMIT")
         return bool(val and str(val).lower() in {"true", "yes", "1", "on"})
+
+    async def get_pm_warn_limit(self) -> int:
+        val = await self.get_env("PM_PERMIT_LIMIT")
+        try:
+            limit = int(val) if val is not None else 3
+            return max(1, min(limit, 20))
+        except Exception:
+            return 3
+
+    async def get_pm_custom_msg(self) -> Optional[str]:
+        val = await self.get_env("PM_PERMIT_CUSTOM_MSG")
+        return str(val) if val and str(val).strip() else None
+
+    async def get_pm_allow_contacts(self) -> bool:
+        val = await self.get_env("PM_PERMIT_ALLOW_CONTACTS")
+        if val is None:
+            return True
+        return str(val).lower() in {"true", "yes", "1", "on"}
+

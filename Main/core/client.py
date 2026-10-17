@@ -135,6 +135,7 @@ class AltruixClient:
         self._pending_bot_handlers: List[Tuple[str, Optional[Filter], Callable]] = []
         self.sudo_cmd_handler = getattr(self.config, "SUDO_CMD_HANDLER", "!") or "!"
         self.user_command_handler = getattr(self.config, "CMD_HANDLER", ".") or "."
+        self.bot_command_handler = getattr(self.config, "BOT_CMD_HANDLER", "/") or "/"
         self.bot_mode = getattr(self.config, "BOT_MODE", False)
         self.plugin_manager: Optional[PluginManager] = None  # initialized after setup
         self._stop_event: Optional[asyncio.Event] = None
@@ -339,6 +340,7 @@ class AltruixClient:
             group_only=group_only,
             channel_only=channel_only,
             private_only=pm_only,
+            bot_mode_unsupported=bot_mode_unsupported,
         )
 
         def decorator(func: Callable):
@@ -392,9 +394,10 @@ class AltruixClient:
 
                     user_p = getattr(self, "user_command_handler", ".") or "."
                     sudo_p = getattr(self, "sudo_cmd_handler", "!") or "!"
+                    bot_p = getattr(self, "bot_command_handler", "/") or "/"
 
                     first_char = raw_text[0]
-                    valid_prefixes = ("/", user_p, sudo_p) if is_bot_client else (user_p, sudo_p)
+                    valid_prefixes = (bot_p, "/") if is_bot_client else (user_p, sudo_p)
                     if first_char not in valid_prefixes:
                         return
 
@@ -644,6 +647,7 @@ class AltruixClient:
         group_only: bool,
         channel_only: bool,
         private_only: bool,
+        bot_mode_unsupported: bool = False,
     ) -> None:
         example = html.escape(str(help_map.get("example", "No example available")))
         help_text = html.escape(str(help_map.get("help", "Sorry, No help available for this command")))
@@ -660,6 +664,7 @@ class AltruixClient:
             "group_only": group_only,
             "channel_only": channel_only,
             "private_only": private_only,
+            "bot_mode_unsupported": bot_mode_unsupported,
         }
         if file_name not in self.cmd_list:
             self.cmd_list[file_name] = [data]
@@ -888,6 +893,17 @@ class AltruixClient:
 
     def prepare_help(self) -> None:
         self._command_help_message_data.clear()
+        owner_only_cmds = {
+            "apm", "apmpanel", "apm_install", "apm_uninstall", "unapm",
+            "apm_update", "updateapm", "apm_sub", "apmsub", "subcategories",
+            "apm_enable", "apmenable", "apm_disable", "apmdisable",
+            "apm_doctor", "apmdoctor", "apm_repair", "apmrepair", "apmfix",
+            "eval", "exec", "bash", "sh", "terminal", "py", "install",
+            "addsudo", "rmsudo", "dpfs", "rmdfs",
+            "restart", "reload", "shutdown", "update", "add_session", "session", "token",
+        }
+        disabled_sudo = set(str(x).lower() for x in (getattr(self, "disabled_sudo_plugin_list", []) or []))
+
         for plugin_name, commands_data in self.cmd_list.items():
             p_name = plugin_name.lower()
             self._command_help_message_data[p_name] = ""
@@ -896,11 +912,49 @@ class AltruixClient:
                 h_text = cmd_info.get("help", "")
                 ex_text = cmd_info.get("example", "")
                 user_args = cmd_info.get("user_args", [])
+                bot_unsupported = cmd_info.get("bot_mode_unsupported", False)
+                p_only = cmd_info.get("private_only", False)
+                g_only = cmd_info.get("group_only", False)
+                c_only = cmd_info.get("channel_only", False)
+                r_reply = cmd_info.get("requires_reply", False)
+                r_input = cmd_info.get("requires_input", False)
+
+                bot_status = "👤 Userbot Only" if bot_unsupported else "🤖 Bot & Userbot"
+
+                is_owner_only = any(c.lower() in owner_only_cmds for c in cmds) or (p_name in owner_only_cmds)
+                is_sudo_disabled = any(c.lower() in disabled_sudo for c in cmds) or (p_name in disabled_sudo)
+                if is_owner_only:
+                    sudo_status = "👑 Owner Only (Sudo Blocked)"
+                elif is_sudo_disabled:
+                    sudo_status = "🚫 Sudo Disabled"
+                else:
+                    sudo_status = "🛡️ Sudo Allowed"
+
+                if p_only:
+                    scope = "💬 PM Only"
+                elif g_only:
+                    scope = "👥 Groups Only"
+                elif c_only:
+                    scope = "📢 Channels Only"
+                else:
+                    scope = "🌐 All Chats"
+
                 self._command_help_message_data[p_name] += "\n<b>Command:</b> "
                 for c in cmds:
                     self._command_help_message_data[p_name] += f"<code>{self.user_command_handler}{c}</code> / "
                 self._command_help_message_data[p_name] = self._command_help_message_data[p_name].rstrip("/ ") + "\n"
                 self._command_help_message_data[p_name] += f"<b>Help:</b> <i>{h_text}</i>\n"
+                self._command_help_message_data[p_name] += f"<b>Mode:</b> {bot_status}  |  <b>Sudo:</b> {sudo_status}\n"
+                self._command_help_message_data[p_name] += f"<b>Scope:</b> {scope}"
+                reqs = []
+                if r_reply:
+                    reqs.append("↩️ Reply Needed")
+                if r_input:
+                    reqs.append("✍️ Input Needed")
+                if reqs:
+                    self._command_help_message_data[p_name] += f" (<i>{', '.join(reqs)}</i>)"
+                self._command_help_message_data[p_name] += "\n"
+
                 if ex_text:
                     self._command_help_message_data[p_name] += f"<b>Example:</b> <code>{self.user_command_handler}{ex_text}</code>\n"
                 if user_args:

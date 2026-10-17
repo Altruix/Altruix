@@ -229,7 +229,7 @@ async def help_callback(c, cq):
     await cq.edit(p_text, buttons=p_buttons, parse_mode="html")
 
 
-@Altruix.bot.on_message(filters.command(["help"], prefixes=["/", ".", "!"]))
+@Altruix.bot.on_message(filters.command(["help"], prefixes="/"))
 @log_errors
 async def bot_help_message_handler(c, m):
     sender_id = getattr(m, "sender_id", None)

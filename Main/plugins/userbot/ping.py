@@ -32,6 +32,14 @@ from Main.core.decorators import inline_check
 )
 async def ping_ub_cmd(c: Client, m: Message):
     user_args = m.user_args
+    if "c" not in user_args and "-basic" not in user_args and "-text" not in user_args:
+        try:
+            from Main.utils.inline_helper import send_inline_widget
+            if await send_inline_widget(c, m, "ping"):
+                return
+        except Exception:
+            pass
+
     start = time.perf_counter()
     await c.get_me()
     uptime = Essentials.get_readable_time(time.time() - Altruix.start_time)
