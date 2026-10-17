@@ -410,6 +410,25 @@ class TestDatabaseAsyncOperations(unittest.IsolatedAsyncioTestCase):
         await whisper_col.delete_many({"expires_at": {"$lt": now + 90000}})
         self.assertIsNone(await whisper_col.find_one({"_id": "test_whisper_123"}))
 
+        # 8. whisper burn-after-reading (one-time read by intended user)
+        burn_doc = {
+            "_id": "whisper_burn_999",
+            "user": 1234567,
+            "msg": "Burn me after reading",
+            "sender_id": 999999,
+            "created_at": now,
+            "expires_at": now + 86400,
+        }
+        await whisper_col.insert_one(burn_doc)
+        # Recipient reads -> deleted from DB
+        found = await whisper_col.find_one({"_id": "whisper_burn_999"})
+        self.assertIsNotNone(found)
+        self.assertEqual(found["msg"], "Burn me after reading")
+        await whisper_col.delete_one({"_id": "whisper_burn_999"})
+        # Subsequent reads return None
+        self.assertIsNone(await whisper_col.find_one({"_id": "whisper_burn_999"}))
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -57,7 +57,7 @@ def get_twp_step1_text() -> str:
 
 
 def get_twp_step1_buttons() -> list:
-    return [
+    btns = [
         [
             custom.Button.inline("📁 SQLite (Default Embedded)", b"twp_set_db:sqlite"),
             custom.Button.inline("☁️ MongoDB Atlas (Cloud)", b"twp_set_db:mongo"),
@@ -69,7 +69,11 @@ def get_twp_step1_buttons() -> list:
         [
             custom.Button.inline("🔍 Pre-Flight Diagnostics", b"twp_diag"),
         ],
+        [
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+        ],
     ]
+    return btns
 
 
 # ==========================================
@@ -91,7 +95,7 @@ def get_twp_step2_text() -> str:
 
 
 def get_twp_step2_buttons() -> list:
-    return [
+    btns = [
         [
             custom.Button.inline("📱 Quick Login (with Secure NumPad)", b"session_no"),
         ],
@@ -105,7 +109,67 @@ def get_twp_step2_buttons() -> list:
         [
             custom.Button.inline("🔍 Pre-Flight Diagnostics", b"twp_diag"),
         ],
+        [
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+        ],
     ]
+    return btns
+
+
+def get_main_start_dashboard(mention: str = "User") -> tuple:
+    caption_template = Altruix.get_string("BOT_ST_MSG") or "Welcome {0}! {1}"
+    caption = caption_template.format(mention, Altruix.config.CUSTOM_BT_START_MSG or "")
+    if not Altruix.training_wheels_protocol:
+        caption += "\n\n🎛️ <b>Control Center:</b> Use the quick options below to configure settings, add accounts, or view commands:"
+        start_buttons = [
+            [
+                custom.Button.inline("📖 Help & Commands", b"help#_cat?cat=all&page=0"),
+                custom.Button.inline("⚙️ Settings Panel", b"panel_refresh"),
+            ],
+            [
+                custom.Button.inline("➕ Add Telegram Account", b"twp_step2_session"),
+                custom.Button.inline("👥 Active Accounts", b"panel_sessions"),
+            ],
+            [
+                custom.Button.inline("🛡️ PM Security", b"panel_toggle_pm"),
+                custom.Button.inline("⚡ Ping & Status", b"panel_ping"),
+            ],
+        ]
+    else:
+        start_buttons = [
+            [custom.Button.inline("📖 Help Menu", b"help#_cat?cat=all&page=0")],
+            [custom.Button.inline("⚡ Step 1: Database Setup", b"twp_db_menu")],
+            [custom.Button.inline("⚡ Step 2: Account Login", b"twp_step2_session")],
+        ]
+    return caption, start_buttons
+
+
+@Altruix.bot.on_callback_query(filters.regex(r"^(bot_start_menu|start_hub|start_menu)$"))
+@log_errors
+async def bot_start_menu_cb_handler(c, cq):
+    # Cancel any pending login / conversation locks
+    from Main.internals.make_session import _PENDING_LOGINS
+    from Main.utils.suppress import suppress_error
+    _PENDING_LOGINS.discard(cq.chat_id)
+    if hasattr(Altruix.bot, "_conversations"):
+        with suppress_error():
+            for c_obj in list(Altruix.bot._conversations.get(cq.chat_id, set())):
+                c_obj._cancel_all()
+            Altruix.bot._conversations.pop(cq.chat_id, None)
+
+    mention = getattr(cq.sender, "first_name", "User") or "User"
+    caption, buttons = get_main_start_dashboard(mention)
+    try:
+        await cq.edit(caption, buttons=buttons, parse_mode="html")
+    except Exception:
+        path_ = "./cache/bot_st_media.*"
+        logo = Path(__file__).resolve().parents[1] / "assets" / "images" / "logo.jpg"
+        file = glob.glob(path_)[0] if glob.glob(path_) else str(logo)
+        try:
+            await cq.delete()
+        except Exception:
+            pass
+        await c.send_file(cq.chat_id, file, caption=caption, buttons=buttons, parse_mode="html")
 
 
 # ==========================================
@@ -115,10 +179,21 @@ def get_twp_step2_buttons() -> list:
 @Altruix.bot.on_message(filters.command("start", "/") & filters.private)
 @log_errors
 async def start_command_handler(c, m):
-    payload = m.text.replace("/start", "").strip() if m.text else ""
     sender_id = getattr(m, "sender_id", None)
     if sender_id is None and hasattr(m, "from_user") and m.from_user:
         sender_id = getattr(m.from_user, "id", None)
+
+    # Cancel any stuck logins / conversations for this user
+    from Main.internals.make_session import _PENDING_LOGINS
+    from Main.utils.suppress import suppress_error
+    _PENDING_LOGINS.discard(sender_id)
+    if hasattr(Altruix.bot, "_conversations"):
+        with suppress_error():
+            for c_obj in list(Altruix.bot._conversations.get(sender_id, set())):
+                c_obj._cancel_all()
+            Altruix.bot._conversations.pop(sender_id, None)
+
+    payload = m.text.replace("/start", "").strip() if m.text else ""
 
     if payload == "help" or payload.startswith("help"):
         if not sender_id or sender_id not in Altruix.auth_users:
@@ -132,12 +207,11 @@ async def start_command_handler(c, m):
         logo = Path(__file__).resolve().parents[1] / "assets" / "images" / "logo.jpg"
         file = glob.glob(path_)[0] if glob.glob(path_) else str(logo)
         mention = m.from_user.mention if m.from_user else "User"
-        caption_template = Altruix.get_string("BOT_ST_MSG") or "Welcome {0}! {1}"
-        caption = caption_template.format(mention, Altruix.config.CUSTOM_BT_START_MSG or "")
 
-        start_buttons = []
-        if sender_id in Altruix.auth_users:
-            start_buttons.append([custom.Button.inline("📖 Help Menu", b"help#_cat?cat=all&page=0")])
+        caption, start_buttons = get_main_start_dashboard(mention)
+
+        if sender_id not in Altruix.auth_users and not is_twp_authorized(sender_id):
+            start_buttons = []
 
         await m.reply_file(file, caption=caption, buttons=start_buttons or None, send_msg_if_file_invalid=True)
 
@@ -188,30 +262,50 @@ async def add_session_yes_cb_handler(c, cb):
 
     await cb.answer()
     if hasattr(Altruix.bot, "_conversations"):
+        from Main.utils.suppress import suppress_error
         with suppress_error():
             for c_obj in list(Altruix.bot._conversations.get(cb.chat_id, set())):
                 c_obj._cancel_all()
             Altruix.bot._conversations.pop(cb.chat_id, None)
 
-    async with Altruix.bot.conversation(cb.chat_id, timeout=300, exclusive=False) as conv:
-        prompt = await conv.send_message(
-            "📋 Please send your Telethon StringSession.\n\n"
-            "💡 You can also generate one in terminal without risk of expired codes:\n"
-            "<code>py -3 -m Main.scripts.wizard</code>\n\n"
-            "Use /cancel to cancel.",
+    try:
+        async with Altruix.bot.conversation(cb.chat_id, timeout=300, exclusive=False) as conv:
+            prompt = await conv.send_message(
+                "📋 Please send your Telethon StringSession.\n\n"
+                "💡 You can also generate one in terminal without risk of expired codes:\n"
+                "<code>py -3 -m Main.scripts.wizard</code>\n\n"
+                "Tap below or send /cancel to abort.",
+                buttons=[[custom.Button.inline("❌ Cancel / Main Menu", b"bot_start_menu")]],
+                parse_mode="html",
+            )
+            session_resp = await conv.get_response(prompt)
+            text = session_resp.raw_text.strip()
+            if text.lower().startswith(("/cancel", "/start", "/stop", "/abort", "cancel", "menu")):
+                if text.startswith("/start"):
+                    mention = getattr(session_resp.sender, "first_name", "User") or "User"
+                    caption, buttons = get_main_start_dashboard(mention)
+                    return await conv.send_message(caption, buttons=buttons, parse_mode="html")
+                return await conv.send_message(
+                    "Session setup cancelled.",
+                    buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
+                )
+
+            match = re.search(r"(\S{100,600})", text)
+            if not match:
+                return await conv.send_message(
+                    "The string session format looks invalid. Please try again.",
+                    buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
+                )
+
+            session_str = match.group(1)
+            await persist_and_finalize_session(None, session_str, cb.chat_id)
+    except asyncio.TimeoutError:
+        return await Altruix.bot.send_message(
+            cb.chat_id,
+            "⏱️ <b>Session entry timed out.</b> Tap below to return to the main menu.",
+            buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
             parse_mode="html",
         )
-        session_resp = await conv.get_response(prompt)
-        text = session_resp.raw_text.strip()
-        if text.startswith("/cancel"):
-            return await conv.send_message("Session setup cancelled.")
-
-        match = re.search(r"(\S{100,600})", text)
-        if not match:
-            return await conv.send_message("The string session format looks invalid. Please try again.")
-
-        session_str = match.group(1)
-        await persist_and_finalize_session(None, session_str, cb.chat_id)
 
 
 # ==========================================
@@ -239,22 +333,41 @@ async def twp_set_db_handler(c, cq):
         name = "MongoDB Atlas URI (mongodb+srv://...)" if choice == "mongo" else "PostgreSQL URI (postgresql://...)"
         await cq.answer()
         if hasattr(Altruix.bot, "_conversations"):
+            from Main.utils.suppress import suppress_error
             with suppress_error():
                 for c_obj in list(Altruix.bot._conversations.get(cq.chat_id, set())):
                     c_obj._cancel_all()
                 Altruix.bot._conversations.pop(cq.chat_id, None)
 
-        async with Altruix.bot.conversation(cq.chat_id, timeout=120, exclusive=False) as conv:
-            msg = await conv.send_message(f"Please send your {name}:\n\nUse /cancel to abort.")
-            resp = await conv.get_response(msg)
-            val = resp.raw_text.strip()
-            if val == "/cancel":
-                return await conv.send_message("Database configuration cancelled.")
-            if Altruix.config and Altruix.db is not None:
-                await Altruix.config.add_env_to_db("DB_URI", val, upsert=True)
-            await conv.send_message(
-                f"✅ <b>Database Configured!</b>\n\n<code>{val}</code>\n\n" + get_twp_step2_text(),
-                buttons=get_twp_step2_buttons(),
+        try:
+            async with Altruix.bot.conversation(cq.chat_id, timeout=120, exclusive=False) as conv:
+                msg = await conv.send_message(
+                    f"Please send your {name}:\n\nTap below or send /cancel to abort.",
+                    buttons=[[custom.Button.inline("❌ Cancel / Main Menu", b"bot_start_menu")]],
+                )
+                resp = await conv.get_response(msg)
+                val = resp.raw_text.strip()
+                if val.lower().startswith(("/cancel", "/start", "/stop", "/abort", "cancel", "menu")):
+                    if val.startswith("/start"):
+                        mention = getattr(resp.sender, "first_name", "User") or "User"
+                        caption, buttons = get_main_start_dashboard(mention)
+                        return await conv.send_message(caption, buttons=buttons, parse_mode="html")
+                    return await conv.send_message(
+                        "Database configuration cancelled.",
+                        buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
+                    )
+                if Altruix.config and Altruix.db is not None:
+                    await Altruix.config.add_env_to_db("DB_URI", val, upsert=True)
+                await conv.send_message(
+                    f"✅ <b>Database Configured!</b>\n\n<code>{val}</code>\n\n" + get_twp_step2_text(),
+                    buttons=get_twp_step2_buttons(),
+                    parse_mode="html",
+                )
+        except asyncio.TimeoutError:
+            return await Altruix.bot.send_message(
+                cq.chat_id,
+                "⏱️ <b>Database setup timed out.</b> Tap below to return to the main menu.",
+                buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
                 parse_mode="html",
             )
 
@@ -284,7 +397,10 @@ async def twp_prefix_menu_handler(c, cq):
             custom.Button.inline(", (Comma)", b"twp_set_pfx:,"),
             custom.Button.inline("? (Question)", b"twp_set_pfx:?"),
         ],
-        [custom.Button.inline("🔙 Back to Step 2 (Account)", b"twp_step2_session")],
+        [
+            custom.Button.inline("⚙️ Settings Panel", b"panel_refresh"),
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+        ],
     ]
     await cq.edit(text, buttons=buttons, parse_mode="html")
 
@@ -304,7 +420,12 @@ async def twp_set_prefix_handler(c, cq):
         f"Current Prefix: <code>{pfx}</code>\n"
         f"Commands will now use: <code>{pfx}ping</code>, <code>{pfx}help</code>, etc."
     )
-    buttons = [[custom.Button.inline("🔙 Back to Step 2 (Account)", b"twp_step2_session")]]
+    buttons = [
+        [
+            custom.Button.inline("⚙️ Settings Panel", b"panel_refresh"),
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+        ]
+    ]
     await cq.edit(text, buttons=buttons, parse_mode="html")
 
 
@@ -359,6 +480,9 @@ async def twp_diag_handler(c, cq):
 
     buttons = [
         [custom.Button.inline("🔄 Re-run Check", b"twp_diag")],
-        [custom.Button.inline("🔙 Back to Step 1 (Database)", b"twp_db_menu")],
+        [
+            custom.Button.inline("🔙 Back to Step 1", b"twp_db_menu"),
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+        ],
     ]
     await cq.edit(diag_text, buttons=buttons, parse_mode="html")

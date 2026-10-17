@@ -470,6 +470,9 @@ class Config(BaseConfig):
         val = await self.get_env("PM_PERMIT")
         return bool(val and str(val).lower() in {"true", "yes", "1", "on"})
 
+    async def set_pm_sts(self, enable: bool) -> None:
+        await self.sync_env_to_db("PM_PERMIT", "true" if enable else "false")
+
     async def get_pm_warn_limit(self) -> int:
         val = await self.get_env("PM_PERMIT_LIMIT")
         try:
@@ -487,4 +490,25 @@ class Config(BaseConfig):
         if val is None:
             return True
         return str(val).lower() in {"true", "yes", "1", "on"}
+
+    async def set_env(self, key: str, val: Any) -> None:
+        key = key.strip().upper()
+        if not hasattr(self, "_env_cache"):
+            self._env_cache = {}
+        self._env_cache[key] = val
+        setattr(self, key, val)
+        await self.add_env_to_db(key, val, upsert=True)
+
+    async def sync_env_to_db(self, key: str, val: Any) -> None:
+        await self.set_env(key, val)
+
+    async def get_progress_bar_sts(self) -> bool:
+        val = await self.get_env("USE_PROGRESS_BAR")
+        if val is None:
+            return False  # Disabled by default for clean transfers; can be enabled in settings
+        return str(val).lower() in {"true", "yes", "1", "on"}
+
+    async def set_progress_bar_sts(self, enable: bool) -> None:
+        await self.set_env("USE_PROGRESS_BAR", "true" if enable else "false")
+
 

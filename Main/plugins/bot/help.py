@@ -89,8 +89,12 @@ async def get_help_menu(category: str = "all", page: int = 0):
             page_buttons = page_buttons[start_idx : start_idx + 5]
         current_grid.append(page_buttons)
 
-    # Append Close button
-    current_grid.append([custom.Button.inline("Close", b"close_help")])
+    # Append Control buttons & Close
+    current_grid.append([
+        custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+        custom.Button.inline("⚙️ Settings", b"panel_refresh"),
+        custom.Button.inline("✖ Close", b"close_help"),
+    ])
     return current_grid
 
 
@@ -103,7 +107,12 @@ async def get_plugin_data(plugin: str, page: int = 0, category: str = "all"):
         f"<b>Help for</b> <code>{p_name}</code>  <i>[{badge}]</i>\n\n"
         f"{Altruix._command_help_message_data[p_name].strip()}"
     )
-    buttons = [[custom.Button.inline("Back", f"help#_page?cat={category}&page={page}".encode("utf-8"))]]
+    buttons = [
+        [
+            custom.Button.inline("🔙 Back", f"help#_page?cat={category}&page={page}".encode("utf-8")),
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+        ]
+    ]
     return text, buttons
 
 
@@ -113,7 +122,12 @@ async def get_plugin_data(plugin: str, page: int = 0, category: str = "all"):
 async def close_help(c, cq):
     await cq.edit(
         "<b>Help Menu Closed 🔐</b>",
-        buttons=[[custom.Button.inline("Re-Open", b"re_open")]],
+        buttons=[
+            [
+                custom.Button.inline("Re-Open", b"re_open"),
+                custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+            ]
+        ],
         parse_mode="html",
     )
 

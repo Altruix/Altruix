@@ -62,9 +62,9 @@ async def whisper(c, iq):
 
     builder = iq.builder
     w_text = Altruix.get_string("WHISPER", user=user_trail) or (
-        f"<b>A Whisper Has Been Sent For {user_trail}</b>\n"
-        "Click Below To Check Message!\n"
-        "<i>Note: Only the recipient (or sender) can open it! (Expires in 24 hours)</i>"
+        f"<b>A Secret Whisper Has Been Sent For {user_trail}</b>\n\n"
+        "Click below to read message!\n"
+        "🔒 <i>Self-Destruct: Once the recipient reads this message, it is permanently deleted from the database.</i>"
     )
     result = builder.article(
         title=f"Whisper to {user_trail}",
@@ -95,7 +95,7 @@ async def whisper_callback(c, cq):
             pass
 
     if not msg_dict:
-        return await cq.answer(Altruix.get_string("CACHE_LOST") or "Whisper expired or not found.", alert=True)
+        return await cq.answer("🔒 This whisper has already been read and self-destructed.", alert=True)
 
     # 2. Check 1-Day TTL expiration
     expires_at = msg_dict.get("expires_at", 0)
@@ -112,17 +112,45 @@ async def whisper_callback(c, cq):
     sender_id = cq.sender_id
     creator_id = msg_dict.get("sender_id")
 
-    # 3. Access authorization check
-    if sender_id in Altruix.auth_users or (creator_id and sender_id == creator_id):
-        return await cq.answer(MSG, alert=True)
-
+    # 3. Check if clicker is the intended recipient
+    is_recipient = False
     if isinstance(user_id_or_username, int):
         if sender_id == int(user_id_or_username):
-            return await cq.answer(MSG, alert=True)
+            is_recipient = True
     elif hasattr(cq, "sender") and getattr(cq.sender, "username", None):
         uname = cq.sender.username.lstrip("@")
         target_name = str(user_id_or_username).lstrip("@")
         if uname.lower() == target_name.lower():
-            return await cq.answer(MSG, alert=True)
+            is_recipient = True
 
-    await cq.answer(Altruix.get_string("WHISPER_INVALID_USER") or "You are not authorized to view this whisper.", alert=True)
+    is_sender_or_owner = (sender_id in Altruix.auth_users) or (creator_id and sender_id == creator_id)
+
+    if not is_recipient and not is_sender_or_owner:
+        return await cq.answer(
+            Altruix.get_string("WHISPER_INVALID_USER") or "You are not authorized to view this whisper.",
+            alert=True,
+        )
+
+    # If sender/owner previews it before the recipient, don't burn it yet
+    if is_sender_or_owner and not is_recipient:
+        return await cq.answer(f"[Whisper Sent by You]\n{MSG}", alert=True)
+
+    # Intended recipient opened the whisper!
+    # 1. Show message to the recipient
+    await cq.answer(MSG, alert=True)
+
+    # 2. Burn after reading: wipe from memory cache & database
+    MSGS_DICT.pop(_id, None)
+    if Altruix.db is not None:
+        with suppress_error(msg="Deleting burned whisper from DB"):
+            await Altruix.db["WHISPERS"].delete_one({"_id": _id})
+
+    # 3. Update the inline message to show the secret is done and destroyed
+    with suppress_error(msg="Editing destroyed whisper message"):
+        recipient_tag = f"@{cq.sender.username}" if hasattr(cq, "sender") and getattr(cq.sender, "username", None) else "The recipient"
+        await cq.edit(
+            f"🔒 <b>Secret Whisper Destroyed</b>\n\n"
+            f"<i>{recipient_tag} has read this whisper. The secret has been permanently wiped from the database.</i>",
+            buttons=None,
+            parse_mode="html",
+        )

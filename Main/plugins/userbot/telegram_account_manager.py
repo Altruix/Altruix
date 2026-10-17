@@ -35,6 +35,8 @@ from Main.utils.suppress import suppress_error
             {"arg": "channel", "help": "Set or remove personal channel on profile (-channel @chan|id|off)", "requires_input": True},
             {"arg": "bday", "help": "Set or remove birthday (-bday DD MM [YYYY]|off)", "requires_input": True},
             {"arg": "privacy", "help": "View your account privacy rules and visibility settings", "requires_input": False},
+            {"arg": "sessions", "help": "List all active Altruix userbot accounts and segregation status", "requires_input": False},
+            {"arg": "logout", "help": "Disconnect and logout this session from Altruix (-logout or -logout <idx>)", "requires_input": False},
         ],
     },
 )
@@ -99,6 +101,10 @@ async def account_modify(c: Client, m: Message):
         if p_chan_id and isinstance(p_chan_id, (int, str)):
             personal_channel_str = f"<code>-100{p_chan_id}</code>"
 
+        clients_list = getattr(Altruix, "clients", [])
+        c_idx = (clients_list.index(c) + 1) if c in clients_list else 1
+        total_c = len(clients_list) or 1
+
         overview = (
             "<b>⚙️ Telegram Account Settings & Profile:</b>\n\n"
             "<b>👤 User Information:</b>\n"
@@ -108,6 +114,7 @@ async def account_modify(c: Client, m: Message):
             f"  • <b>Phone:</b> <code>{phone}</code>\n"
             f"  • <b>Premium:</b> <i>{premium_status}</i>\n"
             f"  • <b>Data Center:</b> <code>DC {dc_id}</code>\n"
+            f"  • <b>Altruix Session:</b> <code>Account #{c_idx} of {total_c} (Segregated MTProto)</code>\n"
             f"  • <b>Bio:</b> <i>{about_text or 'None'}</i>\n"
             f"  • <b>Birthday:</b> <code>{birthday_str}</code>\n"
             f"  • <b>Personal Channel:</b> {personal_channel_str}\n\n"
@@ -120,7 +127,8 @@ async def account_modify(c: Client, m: Message):
             f"<i>Modify using flags:</i> <code>{Altruix.user_command_handler}set -f &lt;name&gt;</code>, "
             f"<code>-l</code>, <code>-name</code>, <code>-b</code>, <code>-u</code>, <code>-p</code>, "
             f"<code>-dp</code>, <code>-s</code>, <code>-ts</code>, <code>-ttl</code>, <code>-sensitive</code>, "
-            f"<code>-archive</code>, <code>-signup</code>, <code>-channel</code>, <code>-bday</code>, <code>-privacy</code>"
+            f"<code>-archive</code>, <code>-signup</code>, <code>-channel</code>, <code>-bday</code>, <code>-privacy</code>, "
+            f"<code>-sessions</code>, <code>-logout</code>"
         )
         return await msg.edit_msg(overview)
 
@@ -369,4 +377,119 @@ async def account_modify(c: Client, m: Message):
                 text_ += f"  • <b>{label}:</b> <code>Hidden</code>\n"
         return await msg.edit_msg(text_)
 
+    # 18. LIST ALL ALTRUIX SESSIONS: -sessions
+    if "sessions" in args or "-sessions" in args or "clients" in args or "-clients" in args:
+        clients_list = getattr(Altruix, "clients", [])
+        text_ = f"👥 <b>Active Altruix Userbot Accounts:</b> ({len(clients_list)} connected)\n\n"
+        for i, cl in enumerate(clients_list):
+            u = getattr(cl, "myself", None)
+            u_name = getattr(u, "first_name", f"Account #{i + 1}") if u else f"Account #{i + 1}"
+            u_nick = f"@{u.username}" if (u and getattr(u, "username", None)) else "No username"
+            u_id = getattr(u, "id", "Unknown") if u else "Unknown"
+            dc = getattr(getattr(cl, "session", None), "dc_id", "?")
+            curr_tag = " <i>[Current Session]</i>" if cl == c else ""
+            text_ += (
+                f"<b>{i + 1}.</b> <b>{u_name}</b> ({u_nick}){curr_tag}\n"
+                f"   • <b>User ID:</b> <code>{u_id}</code>\n"
+                f"   • <b>Data Center:</b> <code>DC {dc}</code>\n"
+                f"   • <b>Segregation:</b> <code>Dedicated MTProto Connection</code>\n\n"
+            )
+        text_ += (
+            f"💡 <i>Each account operates in an isolated event loop and connection.</i>\n"
+            f"<i>To disconnect an account:</i> <code>{Altruix.user_command_handler}account -logout [index]</code>"
+        )
+        return await msg.edit_msg(text_)
+
+    # 19. LOGOUT SESSION: -logout [index]
+    if "logout" in args or "-logout" in args:
+        clients_list = getattr(Altruix, "clients", [])
+        target_client = c
+        target_idx = clients_list.index(c) if c in clients_list else 0
+
+        if m.user_input and m.user_input.strip().isdigit():
+            req_idx = int(m.user_input.strip()) - 1
+            if 0 <= req_idx < len(clients_list):
+                target_idx = req_idx
+                target_client = clients_list[target_idx]
+            else:
+                return await msg.edit_msg(f"❌ Invalid session index. Active accounts: 1 to {len(clients_list)}")
+
+        u = getattr(target_client, "myself", None)
+        u_name = getattr(u, "first_name", f"Account #{target_idx + 1}") if u else f"Account #{target_idx + 1}"
+
+        await msg.edit_msg(f"🚪 Disconnecting and logging out <b>{u_name}</b> (Account #{target_idx + 1})...")
+        success = await Altruix.remove_session(target_client)
+        if success:
+            return await msg.edit_msg(
+                f"✅ <b>Successfully logged out:</b> <b>{u_name}</b> (Account #{target_idx + 1}).\n"
+                "Session disconnected and purged from active memory, configuration, and database."
+            )
+        else:
+            return await msg.edit_msg("❌ Failed to log out session.")
+
     return await msg.edit_msg("INPUT_REQUIRED")
+
+
+@Altruix.register_on_cmd(
+    ["logout"],
+    bot_mode_unsupported=True,
+    cmd_help={
+        "help": "Disconnect and logout this userbot session or another session by index.",
+        "example": "logout",
+    },
+)
+async def logout_cmd(c: Client, m: Message):
+    msg = await m.handle_message("PROCESSING")
+    clients_list = getattr(Altruix, "clients", [])
+    target_client = c
+    target_idx = clients_list.index(c) if c in clients_list else 0
+
+    if m.user_input and m.user_input.strip().isdigit():
+        req_idx = int(m.user_input.strip()) - 1
+        if 0 <= req_idx < len(clients_list):
+            target_idx = req_idx
+            target_client = clients_list[target_idx]
+        else:
+            return await msg.edit_msg(f"❌ Invalid session index. Active accounts: 1 to {len(clients_list)}")
+
+    u = getattr(target_client, "myself", None)
+    u_name = getattr(u, "first_name", f"Account #{target_idx + 1}") if u else f"Account #{target_idx + 1}"
+
+    await msg.edit_msg(f"🚪 Disconnecting and logging out <b>{u_name}</b> (Account #{target_idx + 1})...")
+    success = await Altruix.remove_session(target_client)
+    if success:
+        return await msg.edit_msg(
+            f"✅ <b>Successfully logged out:</b> <b>{u_name}</b> (Account #{target_idx + 1}).\n"
+            "Session disconnected and purged from active memory, configuration, and database."
+        )
+    else:
+        return await msg.edit_msg("❌ Failed to log out session.")
+
+
+@Altruix.register_on_cmd(
+    ["progressbar", "pbar", "uploadprogress"],
+    bot_mode_unsupported=True,
+    cmd_help={
+        "help": "Toggle live ASCII upload progress bar on file transfers (clean mode avoids flood waits).",
+        "example": "progressbar on",
+    },
+)
+async def progressbar_toggle_cmd(c: Client, m: Message):
+    msg = await m.handle_message("PROCESSING")
+    val_str = (m.user_input or "").strip().lower()
+
+    if val_str in ("on", "enable", "true", "1", "yes"):
+        await Altruix.config.set_progress_bar_sts(True)
+        return await msg.edit_msg("📊 <b>Upload Progress Bar:</b> 🟢 Enabled (Dynamic ASCII progress bar on file transfers).")
+    elif val_str in ("off", "disable", "false", "0", "no", "clean"):
+        await Altruix.config.set_progress_bar_sts(False)
+        return await msg.edit_msg("📊 <b>Upload Progress Bar:</b> 🔴 Disabled (Clean mode: transfers run silently without flood waits).")
+    else:
+        current = await Altruix.config.get_progress_bar_sts()
+        sts = "🟢 Enabled" if current else "🔴 Disabled (Clean Mode)"
+        return await msg.edit_msg(
+            f"📊 <b>Upload Progress Bar Status:</b> {sts}\n\n"
+            f"<i>To toggle:</i> <code>{Altruix.user_command_handler}progressbar on|off</code>"
+        )
+
+

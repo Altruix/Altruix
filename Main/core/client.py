@@ -814,6 +814,44 @@ class AltruixClient:
                 await status.edit("<b>Account successfully added!</b>", parse_mode="html")
         return app
 
+    async def remove_session(self, client_or_index: Union[AltruixTelegramClient, int]) -> bool:
+        if isinstance(client_or_index, int):
+            if 0 <= client_or_index < len(self.clients):
+                client = self.clients[client_or_index]
+            else:
+                return False
+        else:
+            client = client_or_index
+
+        session_str = None
+        if hasattr(client, "session") and hasattr(client.session, "save"):
+            with contextlib.suppress(Exception):
+                session_str = client.session.save()
+
+        # Disconnect client
+        with contextlib.suppress(Exception):
+            await client.disconnect()
+
+        # Remove from active lists
+        if client in self.clients:
+            self.clients.remove(client)
+        if hasattr(client, "myself") and client.myself in self.ourselves:
+            self.ourselves.remove(client.myself)
+
+        # Remove from persistent storage
+        if session_str:
+            with contextlib.suppress(Exception):
+                await self.config.pop_element_from_list("SESSIONS", session_str)
+            if hasattr(self.config, "SESSIONS") and session_str in self.config.SESSIONS:
+                idx = self.config.SESSIONS.index(session_str)
+                self.config.pop_session(idx)
+
+        if not self.clients:
+            self.training_wheels_protocol = True
+
+        self.log("User session disconnected and removed successfully.")
+        return True
+
     async def custom_log(self, msg: str, level: int = logging.INFO, p_msg: Any = None) -> Any:
         self.log(msg, level)
         if p_msg and hasattr(p_msg, "edit_msg"):

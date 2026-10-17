@@ -56,6 +56,10 @@ async def _render_pmpermit_panel():
         ],
         [
             custom.Button.inline("🧹 Reset Warnings", b"pmsec_reset"),
+            custom.Button.inline("⚙️ Settings Panel", b"panel_refresh"),
+        ],
+        [
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
             custom.Button.inline("✖ Close", b"pmsec_close"),
         ],
     ]
@@ -78,7 +82,10 @@ async def _render_limits_panel():
             label = f"✅ {num}" if num == limit else str(num)
             row.append(custom.Button.inline(label, f"pmsec_set_limit_{num}".encode("utf-8")))
         buttons.append(row)
-    buttons.append([custom.Button.inline("🔙 Back to Control Panel", b"pmsec_main_panel")])
+    buttons.append([
+        custom.Button.inline("🔙 Back to PM Security", b"pmsec_main_panel"),
+        custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+    ])
     return text, buttons
 
 
@@ -97,7 +104,10 @@ async def _render_msg_panel():
     )
     buttons = [
         [custom.Button.inline("🔄 Reset to Default Template", b"pmsec_reset_msg")],
-        [custom.Button.inline("🔙 Back to Control Panel", b"pmsec_main_panel")],
+        [
+            custom.Button.inline("🔙 Back to PM Security", b"pmsec_main_panel"),
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+        ],
     ]
     return text, buttons
 

@@ -67,6 +67,18 @@ class AltruixTelegramClient(TelegramClient):
         return enrich_message(res, self)
 
     async def send_file(self, *args, **kwargs) -> Any:
+        progress_msg = kwargs.pop("progress_msg", None)
+        if progress_msg and "progress_callback" not in kwargs:
+            file_target = args[1] if len(args) > 1 else kwargs.get("file")
+            fname = "file"
+            if isinstance(file_target, (str, bytes, os.PathLike)):
+                fname = os.path.basename(str(file_target))
+            from Main.utils.progress import create_progress_callback
+            kwargs["progress_callback"] = create_progress_callback(
+                progress_msg,
+                action="Uploading",
+                file_name=fname,
+            )
         res = await super().send_file(*args, **kwargs)
         from Main.core.types.message import enrich_message
         return enrich_message(res, self)

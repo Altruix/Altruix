@@ -63,6 +63,9 @@ async def _render_main_panel():
     pm_sts = await Altruix.config.get_pm_sts()
     pm_badge = "🟢 Enabled" if pm_sts else "🔴 Disabled"
 
+    pbar_sts = await Altruix.config.get_progress_bar_sts()
+    pbar_badge = "🟢 Enabled" if pbar_sts else "🔴 Disabled (Clean)"
+
     clients_count = len(getattr(Altruix, "clients", []))
     prefix = getattr(Altruix, "user_command_handler", ".")
     ver = getattr(Altruix, "__version__", "0.2.0")
@@ -75,13 +78,22 @@ async def _render_main_panel():
         f"• <b>Database:</b> <code>{db_type}</code>\n"
         f"• <b>Prefix Handler:</b> <code>{prefix}</code>\n"
         f"• <b>PM Security:</b> {pm_badge}\n"
+        f"• <b>Upload Progress Bar:</b> {pbar_badge}\n"
         f"• <b>CPU:</b> <code>{cpu_usage}%</code> | <b>RAM:</b> <code>{ram_usage}%</code>\n\n"
         "<i>Use the controls below to configure features or manage the instance:</i>"
     )
 
     buttons = [
         [
-            custom.Button.inline("🛡️ Toggle PM Security", b"panel_toggle_pm"),
+            custom.Button.inline("🛡️ PM Security", b"panel_toggle_pm"),
+            custom.Button.inline("📊 Progress Bar", b"panel_toggle_pbar"),
+        ],
+        [
+            custom.Button.inline("➕ Add New Account / Session", b"twp_step2_session"),
+            custom.Button.inline("👥 Active Accounts", b"panel_sessions"),
+        ],
+        [
+            custom.Button.inline("📖 Help & Commands", b"help#_cat?cat=all&page=0"),
             custom.Button.inline("🗄️ Database Info", b"panel_db_details"),
         ],
         [
@@ -89,7 +101,10 @@ async def _render_main_panel():
             custom.Button.inline("⚡ Ping Check", b"panel_ping"),
         ],
         [
+            custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
             custom.Button.inline("🔄 Restart Altruix", b"panel_restart"),
+        ],
+        [
             custom.Button.inline("✖ Close Panel", b"panel_close"),
         ],
     ]
@@ -181,6 +196,19 @@ async def on_panel_callback(c, cq):
             pass
         return
 
+    if data == "panel_toggle_pbar":
+        current = await Altruix.config.get_progress_bar_sts()
+        new_val = not current
+        await Altruix.config.set_progress_bar_sts(new_val)
+        status_txt = "ENABLED (Live ASCII Bar)" if new_val else "DISABLED (Clean Mode, No FloodWaits)"
+        await cq.answer(f"📊 Upload Progress Bar is now {status_txt}!", alert=True)
+        text, buttons = await _render_main_panel()
+        try:
+            await cq.edit(text, buttons=buttons, parse_mode="html")
+        except Exception:
+            pass
+        return
+
     if data == "panel_ping":
         start = time.perf_counter()
         await cq.answer("Measuring ping...")
@@ -199,6 +227,137 @@ async def on_panel_callback(c, cq):
             if hasattr(db_obj, "dialect"):
                 details += f"\n• Dialect: {db_obj.dialect}"
         await cq.answer(f"🗄️ Database Info:\n{details}", alert=True)
+        return
+
+    if data == "panel_sessions":
+        clients = getattr(Altruix, "clients", [])
+        if not clients:
+            text = "👥 <b>Active Telegram Accounts:</b>\n\n<i>No userbot accounts currently connected (TWP Mode).</i>"
+            buttons = [
+                [custom.Button.inline("➕ Add Telegram Account", b"twp_step2_session")],
+                [
+                    custom.Button.inline("🔙 Back to Panel", b"panel_refresh"),
+                    custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+                ],
+            ]
+        else:
+            text = f"👥 <b>Active Telegram Accounts ({len(clients)} connected):</b>\n\n"
+            buttons = []
+            for i, cl in enumerate(clients):
+                user = getattr(cl, "myself", None)
+                if user:
+                    uname = f"@{user.username}" if getattr(user, "username", None) else "No Username"
+                    name = getattr(user, "first_name", "User")
+                    uid = getattr(user, "id", "Unknown")
+                    text += f"<b>{i + 1}.</b> {name} ({uname})\n   • ID: <code>{uid}</code>\n"
+                else:
+                    text += f"<b>{i + 1}.</b> User Client #{i + 1} (Active)\n"
+                buttons.append([
+                    custom.Button.inline(f"⚙️ Details #{i + 1}", f"panel_sess_info:{i}".encode()),
+                    custom.Button.inline(f"🚪 Logout #{i + 1}", f"panel_logout_prompt:{i}".encode()),
+                ])
+            text += "\n💡 <i>Each session operates independently and safely segregated. Tap below to inspect or disconnect.</i>"
+            buttons.append([custom.Button.inline("➕ Add Another Account", b"twp_step2_session")])
+            buttons.append([
+                custom.Button.inline("🔙 Back to Panel", b"panel_refresh"),
+                custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+            ])
+
+        try:
+            await cq.edit(text, buttons=buttons, parse_mode="html")
+        except Exception:
+            pass
+        return
+
+    if data.startswith("panel_sess_info:"):
+        idx = int(data.split(":", 1)[1])
+        clients = getattr(Altruix, "clients", [])
+        if idx >= len(clients):
+            return await cq.answer("Account not found or already disconnected.", alert=True)
+
+        cl = clients[idx]
+        user = getattr(cl, "myself", None)
+        dc_id = getattr(getattr(cl, "session", None), "dc_id", "Unknown")
+        name = getattr(user, "first_name", "User") if user else f"Client #{idx + 1}"
+        username = f"@{user.username}" if (user and getattr(user, "username", None)) else "None"
+        uid = getattr(user, "id", "Unknown") if user else "Unknown"
+        is_primary = "Primary Owner" if (user and getattr(Altruix.config, "OWNER_ID", None) == user.id) else "Secondary Client"
+
+        text = (
+            f"⚙️ <b>Account #{idx + 1} Settings & Details</b>\n\n"
+            f"• <b>Name:</b> {name}\n"
+            f"• <b>Username:</b> {username}\n"
+            f"• <b>User ID:</b> <code>{uid}</code>\n"
+            f"• <b>Data Center (DC):</b> DC <code>{dc_id}</code>\n"
+            f"• <b>Role:</b> {is_primary}\n"
+            f"• <b>Connection Status:</b> 🟢 Online & Active\n\n"
+            "<i>This session is fully segregated and manages its own independent MTProto connection.</i>"
+        )
+        buttons = [
+            [custom.Button.inline(f"🚪 Logout & Disconnect Account #{idx + 1}", f"panel_logout_prompt:{idx}".encode())],
+            [
+                custom.Button.inline("🔙 Back to Accounts List", b"panel_sessions"),
+                custom.Button.inline("🏠 Main Menu", b"bot_start_menu"),
+            ],
+        ]
+        try:
+            await cq.edit(text, buttons=buttons, parse_mode="html")
+        except Exception:
+            pass
+        return
+
+    if data.startswith("panel_logout_prompt:"):
+        idx = int(data.split(":", 1)[1])
+        clients = getattr(Altruix, "clients", [])
+        if idx >= len(clients):
+            return await cq.answer("Account not found or already disconnected.", alert=True)
+
+        cl = clients[idx]
+        user = getattr(cl, "myself", None)
+        name = getattr(user, "first_name", f"Account #{idx + 1}") if user else f"Account #{idx + 1}"
+
+        text = (
+            f"⚠️ <b>Confirm Logout for {name} (Account #{idx + 1})?</b>\n\n"
+            "This will disconnect the Telethon userbot client and remove its session string from memory, "
+            "configuration, and the database.\n\n"
+            "Are you sure?"
+        )
+        buttons = [
+            [
+                custom.Button.inline("✅ Yes, Disconnect & Logout", f"panel_logout_confirm:{idx}".encode()),
+                custom.Button.inline("❌ Cancel", b"panel_sessions"),
+            ]
+        ]
+        try:
+            await cq.edit(text, buttons=buttons, parse_mode="html")
+        except Exception:
+            pass
+        return
+
+    if data.startswith("panel_logout_confirm:"):
+        idx = int(data.split(":", 1)[1])
+        clients = getattr(Altruix, "clients", [])
+        if idx >= len(clients):
+            return await cq.answer("Account not found or already disconnected.", alert=True)
+
+        await cq.answer("Disconnecting session...")
+        success = await Altruix.remove_session(idx)
+        if success:
+            text = (
+                "✅ <b>Account Successfully Logged Out!</b>\n\n"
+                f"Account #{idx + 1} has been disconnected and removed from the active instance and database."
+            )
+        else:
+            text = "❌ Failed to log out account: Index not found."
+
+        buttons = [
+            [custom.Button.inline("👥 View Remaining Accounts", b"panel_sessions")],
+            [custom.Button.inline("🔙 Back to Main Panel", b"panel_refresh")],
+        ]
+        try:
+            await cq.edit(text, buttons=buttons, parse_mode="html")
+        except Exception:
+            pass
         return
 
     if data == "panel_restart":

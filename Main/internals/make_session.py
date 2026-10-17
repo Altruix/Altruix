@@ -222,27 +222,53 @@ async def add_session_cb_handler(_, cb):
         async with Altruix.bot.conversation(chat_id, timeout=120, exclusive=False) as conv:
             phone_prompt = await conv.send_message(
                 "📱 Please send your Telegram phone number with international country code (e.g. <code>+1234567890</code>).\n\n"
-                "Use /cancel to cancel.",
+                "Tap below or send /cancel to abort.",
+                buttons=[[custom.Button.inline("❌ Cancel / Main Menu", b"bot_start_menu")]],
                 parse_mode="html",
             )
             while True:
                 resp = await conv.get_response(phone_prompt)
                 raw_text = resp.raw_text.strip()
-                if raw_text == "/cancel":
+                if raw_text.lower().startswith(("/cancel", "/start", "/stop", "/abort", "cancel", "menu")):
                     _PENDING_LOGINS.discard(chat_id)
-                    return await conv.send_message("Setup cancelled.")
+                    if raw_text.startswith("/start"):
+                        mention = getattr(resp.sender, "first_name", "User") or "User"
+                        from Main.internals.get_session import get_main_start_dashboard
+                        caption, buttons = get_main_start_dashboard(mention)
+                        return await conv.send_message(caption, buttons=buttons, parse_mode="html")
+                    return await conv.send_message(
+                        "Setup cancelled.",
+                        buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
+                    )
                 cleaned_phone = re.sub(r"[\s\-\(\)]", "", raw_text)
                 if re.match(r"^\+?\d{7,16}$", cleaned_phone):
                     phone_number = cleaned_phone
                     break
                 phone_prompt = await conv.send_message(
                     "❌ That does not look like a valid phone number format.\n"
-                    "Please send your phone number with country code (e.g. <code>+1234567890</code>), or /cancel to abort.",
+                    "Please send your phone number with country code (e.g. <code>+1234567890</code>), or tap below to cancel.",
+                    buttons=[[custom.Button.inline("❌ Cancel / Main Menu", b"bot_start_menu")]],
                     parse_mode="html",
                 )
+    except asyncio.TimeoutError:
+        _PENDING_LOGINS.discard(chat_id)
+        return await Altruix.bot.send_message(
+            chat_id,
+            "⏱️ <b>Setup timed out</b> due to inactivity.\nTap below to return to the main menu.",
+            buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
+            parse_mode="html",
+        )
     except Exception as e:
         _PENDING_LOGINS.discard(chat_id)
-        return await Altruix.bot.send_message(chat_id, f"❌ Setup conversation error: {e}")
+        err_msg = str(e).strip()
+        if not err_msg:
+            err_msg = "Conversation closed or timed out."
+        return await Altruix.bot.send_message(
+            chat_id,
+            f"❌ <b>Setup Notice:</b> {err_msg}",
+            buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
+            parse_mode="html",
+        )
     finally:
         _PENDING_LOGINS.discard(chat_id)
 
@@ -307,7 +333,10 @@ async def on_twp_text_input(client, message):
             with suppress_error():
                 await app.disconnect()
         _ACTIVE_LOGINS.pop(chat_id, None)
-        return await message.reply("❌ Login process cancelled.")
+        return await message.reply(
+            "❌ Login process cancelled.",
+            buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
+        )
 
     # A. 2FA Password Handling (Event-driven, zero conversation locks)
     if state.get("awaiting_2fa"):
@@ -320,6 +349,7 @@ async def on_twp_text_input(client, message):
         except Exception as e:
             return await verifying.edit(
                 f"❌ <b>2FA Verification Failed:</b> <code>{e}</code>\n\nPlease check your password and send it again, or /cancel to abort.",
+                buttons=[[custom.Button.inline("❌ Cancel / Main Menu", b"bot_start_menu")]],
                 parse_mode="html",
             )
 
@@ -361,7 +391,11 @@ async def on_otp_numpad_callback(c, cq):
                 await app.disconnect()
         _ACTIVE_LOGINS.pop(chat_id, None)
         try:
-            await cq.edit("❌ <i>Login operation cancelled.</i>", buttons=None, parse_mode="html")
+            await cq.edit(
+                "❌ <i>Login operation cancelled.</i>",
+                buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
+                parse_mode="html",
+            )
         except Exception:
             pass
         return
@@ -425,7 +459,8 @@ async def _submit_login_code(chat_id: int, message_or_cq):
             "🔐 <b>Two-Step Verification (2FA) Active!</b>\n\n"
             "Your Telegram account has a 2FA Cloud Password enabled.\n"
             "Please send your <b>2FA Password</b> as a text message right now.\n\n"
-            "<i>(Send /cancel to abort)</i>",
+            "<i>(Send /cancel or tap below to abort)</i>",
+            buttons=[[custom.Button.inline("❌ Cancel / Main Menu", b"bot_start_menu")]],
             parse_mode="html",
         )
     except (errors.PhoneCodeInvalidError, errors.PhoneCodeExpiredError) as e:
@@ -434,6 +469,7 @@ async def _submit_login_code(chat_id: int, message_or_cq):
         return await Altruix.bot.send_message(
             chat_id,
             f"❌ <b>Invalid or Expired Code:</b> <code>{e}</code>\n\nPlease restart login via /start.",
+            buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
             parse_mode="html",
         )
     except Exception as e:
@@ -442,6 +478,7 @@ async def _submit_login_code(chat_id: int, message_or_cq):
         return await Altruix.bot.send_message(
             chat_id,
             f"❌ <b>Login failed:</b> <code>{e}</code>\n\n💡 Try terminal session generator: <code>py -3 -m Main.scripts.wizard</code>",
+            buttons=[[custom.Button.inline("🏠 Main Menu", b"bot_start_menu")]],
             parse_mode="html",
         )
 
