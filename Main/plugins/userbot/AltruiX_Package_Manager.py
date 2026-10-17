@@ -51,8 +51,8 @@ async def apm_hub_cmd(c, m: Message):
 @Altruix.register_on_cmd(
     ["apm_install"],
     cmd_help={
-        "example": "apm_install https://github.com/username/XtraPlugins -sub media,lifestyle",
-        "help": "Install external plugins with optional subcategory segregation and fast dependency resolution.",
+        "example": "apm_install vc (auto-maps to Altruix/VCPlugin)\napm_install https://github.com/username/XtraPlugins -sub media,lifestyle",
+        "help": "Install external plugins with optional subcategory segregation and fast dependency resolution. Supports shortcuts like 'vc' for Altruix/VCPlugin.",
         "user_args": [
             {
                 "arg": "sub",
@@ -83,6 +83,10 @@ async def install_pack(c, m: Message):
         subcategories = [s.strip() for s in sub_arg.split(",") if s.strip()]
 
     source = raw.strip()
+    if source.lower() in ("vc", "vcplugin"):
+        source = "Altruix/VCPlugin"
+    elif source.lower() in ("xtra", "xtraplugins"):
+        source = "Altruix/XtraPlugins"
 
     # Priority 1: Use modern PluginManager (APM v3)
     if Altruix.plugin_manager is not None:

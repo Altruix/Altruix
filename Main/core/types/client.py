@@ -49,6 +49,7 @@ class AltruixTelegramClient(TelegramClient):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.__class__.__module__ = "telethon.client.telegramclient"
         from Main.core.html_parser import patch_telethon_html
         patch_telethon_html()
         self.parse_mode = "html"
@@ -329,3 +330,4 @@ class AltruixTelegramClient(TelegramClient):
 
 # Expose Client alias for legacy plugin imports
 Client = AltruixTelegramClient
+AltruixTelegramClient.__module__ = "telethon.client.telegramclient"

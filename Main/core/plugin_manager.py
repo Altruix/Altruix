@@ -48,6 +48,13 @@ ALTRUIX_REGISTRY_URL = "https://raw.githubusercontent.com/Altruix/plugin-registr
 GITHUB_RAW_BASE = "https://raw.githubusercontent.com/{repo}/{branch}/{path}"
 GITHUB_ARCHIVE_BASE = "https://github.com/{repo}/archive/refs/heads/{branch}.zip"
 
+PLUGIN_SHORTCUTS: Dict[str, str] = {
+    "vc": "Altruix/VCPlugin",
+    "vcplugin": "Altruix/VCPlugin",
+    "xtra": "Altruix/XtraPlugins",
+    "xtraplugins": "Altruix/XtraPlugins",
+}
+
 
 @dataclass
 class PluginManifest:
@@ -328,6 +335,10 @@ class PluginManager:
         return self._providers.get(provider_name, self._providers["url"])
 
     async def resolve_manifest(self, source: str, provider: str = "github") -> Optional[PluginManifest]:
+        src_clean = source.strip().lower()
+        if src_clean in PLUGIN_SHORTCUTS:
+            source = PLUGIN_SHORTCUTS[src_clean]
+            provider = "github"
         p = self._get_provider(provider)
         return await p.resolve(source)
 
@@ -402,14 +413,20 @@ class PluginManager:
     ) -> Optional[PluginManifest]:
         """
         Install a plugin with optional subcategory segregation.
-        Example: install('username/XtraPlugins', subcategories=['media', 'utilities'])
+        Example: install('vc') or install('username/XtraPlugins', subcategories=['media', 'utilities'])
         """
-        # Auto-detect GitHub or generic URL provider
-        if source.startswith(("http://github.com/", "https://github.com/", "git@github.com:")):
+        # Resolve package shortcuts (e.g. 'vc' -> 'Altruix/VCPlugin')
+        src_clean = source.strip().lower()
+        if src_clean in PLUGIN_SHORTCUTS:
+            source = PLUGIN_SHORTCUTS[src_clean]
+            provider = "github"
+        elif source.startswith(("http://github.com/", "https://github.com/", "git@github.com:")):
             provider = "github"
             source = GithubProvider._normalize_repo(source)
         elif source.startswith(("http://", "https://")):
             provider = "url"
+        elif "/" in source and not source.startswith((".", "/")):
+            provider = "github"
 
         if manifest is None:
             manifest = await self.resolve_manifest(source, provider)
