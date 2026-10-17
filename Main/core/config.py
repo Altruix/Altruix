@@ -93,6 +93,10 @@ class BaseConfig:
     ]
 
     ALIVE_MEDIA = os.getenv("ALIVE_MEDIA")
+    LOAD_XTRA_PLUGINS = os.getenv("LOAD_XTRA_PLUGINS", "true").lower() in {"true", "yes", "1", "enable"}
+    XTRA_PLUGINS_REPOS: List[str] = [
+        r.strip() for r in re.split(r"[, ]+", os.getenv("XTRA_PLUGINS_REPOS", "https://github.com/Altruix/XtraPlugins")) if r.strip()
+    ]
 
     def reload_from_env(self) -> None:
         """Dynamically load or reload all environment variables into this config instance."""
@@ -137,6 +141,10 @@ class BaseConfig:
             if i.strip().lstrip("-").isdigit()
         ]
         self.ALIVE_MEDIA = os.getenv("ALIVE_MEDIA")
+        self.LOAD_XTRA_PLUGINS = os.getenv("LOAD_XTRA_PLUGINS", "true").lower() in {"true", "yes", "1", "enable"}
+        self.XTRA_PLUGINS_REPOS = [
+            r.strip() for r in re.split(r"[, ]+", os.getenv("XTRA_PLUGINS_REPOS", "https://github.com/Altruix/XtraPlugins")) if r.strip()
+        ]
 
     def digit_wrap(self, digit_: Any) -> Union[str, int]:
         return digit_wrap(digit_)
@@ -262,21 +270,41 @@ class Config(BaseConfig):
     async def load_vars_from_db(self) -> None:
         if self.env_col is None:
             return
+        if not hasattr(self, "_env_cache"):
+            self._env_cache = {}
         try:
             async for var in self.env_col.find({}):
-                setattr(self, var.get("_id"), var.get("env_value"))
+                k = var.get("_id")
+                v = var.get("env_value")
+                setattr(self, k, v)
+                self._env_cache[k] = v
         except Exception as e:
             logger.warning("Error loading vars from DB: %s", e)
 
     async def get_env(self, env_key: str, as_list: bool = False) -> Any:
         env_key = env_key.strip().upper()
+        if not hasattr(self, "_env_cache"):
+            self._env_cache = {}
+        if env_key in self._env_cache:
+            val = self._env_cache[env_key]
+            if as_list and not isinstance(val, (list, tuple)):
+                return [val] if val is not None else []
+            return list(val) if as_list and isinstance(val, (list, tuple)) else val
+
         from_db = await self.get_env_from_db(env_key)
         if from_db is not None:
-            return from_db
+            self._env_cache[env_key] = from_db
+            return list(from_db) if as_list and isinstance(from_db, (list, tuple)) else from_db
+
         from_env = self.get_env_(env_key, as_list)
         if from_env is not None:
+            self._env_cache[env_key] = from_env
             return from_env
-        return getattr(self, env_key, None)
+
+        attr_val = getattr(self, env_key, None)
+        if attr_val is not None:
+            self._env_cache[env_key] = attr_val
+        return attr_val
 
     def get_env_(self, env_key: str, as_list: bool) -> Any:
         env_ = os.getenv(env_key)
@@ -292,12 +320,18 @@ class Config(BaseConfig):
         try:
             if var := await self.env_col.find_one({"_id": env_name}):
                 val = var.get("env_value")
-                return list(val) if isinstance(val, list) else val
+                res = list(val) if isinstance(val, list) else val
+                if not hasattr(self, "_env_cache"):
+                    self._env_cache = {}
+                self._env_cache[env_name] = res
+                return res
         except Exception:
             pass
         return None
 
     async def del_env_from_db(self, env_name: str) -> bool:
+        if hasattr(self, "_env_cache") and env_name in self._env_cache:
+            del self._env_cache[env_name]
         if self.env_col is None:
             return False
         try:
@@ -333,6 +367,8 @@ class Config(BaseConfig):
     async def add_env_to_db(
         self, env_name: str, update: Union[str, int, List[Any], dict], upsert: bool = False
     ) -> None:
+        if hasattr(self, "_env_cache"):
+            self._env_cache.pop(env_name, None)
         if self.DEBUG:
             logger.info("DEBUG mode enabled, skipping DB syncing...")
             return
@@ -348,6 +384,8 @@ class Config(BaseConfig):
             )
 
     async def add_element_to_list(self, env_name: str, value: Any) -> None:
+        if hasattr(self, "_env_cache"):
+            self._env_cache.pop(env_name, None)
         if self.DEBUG:
             logger.info("DEBUG mode enabled, skipping DB syncing...")
             return
@@ -358,6 +396,8 @@ class Config(BaseConfig):
         )
 
     async def pop_element_from_list(self, env_name: str, value: Any) -> None:
+        if hasattr(self, "_env_cache"):
+            self._env_cache.pop(env_name, None)
         if self.env_col is None:
             return
         await self.env_col.find_one_and_update(

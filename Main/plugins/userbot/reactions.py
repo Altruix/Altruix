@@ -45,7 +45,7 @@ async def react_to_message(c: Client, m: Message):
         ))
         await m.delete_if_self()
     except Exception as e:
-        await m.handle_message(f"<b>Failed to react:</b> <code>{e}</code>")
+        await m.handle_message("REACTIONS_FAILED", string_args=(str(e),))
 
 
 @Altruix.register_on_cmd(
@@ -69,7 +69,7 @@ async def remove_reaction(c: Client, m: Message):
         ))
         await m.delete_if_self()
     except Exception as e:
-        await m.handle_message(f"<b>Failed to remove reaction:</b> <code>{e}</code>")
+        await m.handle_message("REACTIONS_FAILED", string_args=(str(e),))
 
 
 @Altruix.register_on_cmd(
@@ -88,12 +88,12 @@ async def get_reaction_stats(c: Client, m: Message):
     # Get the fresh message with reactions
     full_msg = await c.get_messages(m.chat_id, ids=rm.id)
     if not full_msg:
-        return await m.handle_message("Failed to fetch message details.")
+        return await m.handle_message("REACTIONS_EMPTY")
 
     reactions = getattr(full_msg, "reactions", None)
 
     if not reactions or not reactions.results:
-        return await m.handle_message("<b>No reactions on this message.</b>")
+        return await m.handle_message("REACTIONS_EMPTY")
 
     text = "<b>📊 Reaction Stats:</b>\n\n"
     total = 0

@@ -25,56 +25,84 @@ multi_pages = False
 
 
 @log_errors
-async def get_help_menu(return_all: bool = False):
-    global cache_help_menu
-    global multi_pages
-    if cache_help_menu:
-        if multi_pages and not return_all:
-            return cache_help_menu[0]
-        return cache_help_menu
-    plugins = sorted(list(Altruix._command_help_message_data.keys()))
+async def get_help_menu(category: str = "all", page: int = 0):
+    main_plugins, loaded_plugins = Altruix.get_plugins_by_category()
+    all_plugins = sorted(list(Altruix._command_help_message_data.keys()))
+
+    if category == "main":
+        target_plugins = main_plugins
+    elif category == "loaded":
+        target_plugins = loaded_plugins
+    else:
+        category = "all"
+        target_plugins = all_plugins
+
+    cat_tabs = [
+        custom.Button.inline(
+            f"• 📦 Main ({len(main_plugins)}) •" if category == "main" else f"📦 Main ({len(main_plugins)})",
+            b"help#_cat?cat=main&page=0",
+        ),
+        custom.Button.inline(
+            f"• 🧩 Loaded ({len(loaded_plugins)}) •" if category == "loaded" else f"🧩 Loaded ({len(loaded_plugins)})",
+            b"help#_cat?cat=loaded&page=0",
+        ),
+        custom.Button.inline(
+            f"• 🌐 All ({len(all_plugins)}) •" if category == "all" else f"🌐 All",
+            b"help#_cat?cat=all&page=0",
+        ),
+    ]
+
     ikb = [
         custom.Button.inline(
-            plugin.replace("_", " ").title(),
-            f"help#{plugin}".encode("utf-8"),
+            f"{'📦' if Altruix.get_plugin_category(p) == 'main' else '🧩'} {p.replace('_', ' ').title()}",
+            f"help#{p}?cat={category}&page={page}".encode("utf-8"),
         )
-        for plugin in plugins
+        for p in target_plugins
     ]
-    rows = Altruix.config.HELP_MENU_ROWS
-    columns = Altruix.config.HELP_MENU_COLUMNS
-    buttons = [ikb[i : i + columns] for i in range(0, len(ikb), columns)]
-    if len(buttons) > rows:
-        buttons = [buttons[i : i + rows] for i in range(0, len(buttons), rows)]
-        multi_pages = True
-    if multi_pages:
-        new_pages = []
-        for index, page in enumerate(buttons):
-            updated_page = []
-            for row in page:
-                new_row = []
-                for btn in row:
-                    data = getattr(btn, "data", None) or getattr(getattr(btn, "type", None), "data", b"")
-                    new_data = (data.decode("utf-8") if isinstance(data, bytes) else str(data)) + f"?page={index}"
-                    new_row.append(custom.Button.inline(btn.text, new_data.encode("utf-8")))
-                updated_page.append(new_row)
-            page_buttons = [
-                custom.Button.inline(f"> {i + 1} <" if i == index else str(i + 1), f"help#_page?page={i}".encode("utf-8"))
-                for i in range(len(buttons))
-            ]
-            updated_page.append(page_buttons)
-            updated_page.append([custom.Button.inline("Close", b"close_help")])
-            new_pages.append(updated_page)
-        buttons = new_pages
-    cache_help_menu = buttons
-    if multi_pages and not return_all:
-        return cache_help_menu[0]
-    return cache_help_menu
+
+    rows = getattr(Altruix.config, "HELP_MENU_ROWS", 6) or 6
+    columns = getattr(Altruix.config, "HELP_MENU_COLUMNS", 3) or 3
+    chunked = [ikb[i : i + columns] for i in range(0, len(ikb), columns)]
+    pages = [chunked[i : i + rows] for i in range(0, len(chunked), rows)]
+
+    if not pages:
+        pages = [[]]
+
+    page = max(0, min(page, len(pages) - 1))
+    current_grid = list(pages[page])
+
+    # Insert category switcher as the first row
+    current_grid.insert(0, cat_tabs)
+
+    # Append pagination if multiple pages
+    if len(pages) > 1:
+        page_buttons = [
+            custom.Button.inline(
+                f"> {i + 1} <" if i == page else str(i + 1),
+                f"help#_page?cat={category}&page={i}".encode("utf-8"),
+            )
+            for i in range(len(pages))
+        ]
+        if len(page_buttons) > 6:
+            start_idx = max(0, min(page - 2, len(page_buttons) - 5))
+            page_buttons = page_buttons[start_idx : start_idx + 5]
+        current_grid.append(page_buttons)
+
+    # Append Close button
+    current_grid.append([custom.Button.inline("Close", b"close_help")])
+    return current_grid
 
 
 @log_errors
-async def get_plugin_data(plugin: str, number: int = 0):
-    text = f"<b>Help for</b> <code>{plugin}</code>\n\n{Altruix._command_help_message_data[plugin.lower()].strip()}"
-    buttons = [[custom.Button.inline("Back", f"help#_page?page={number}".encode("utf-8"))]]
+async def get_plugin_data(plugin: str, page: int = 0, category: str = "all"):
+    p_name = plugin.lower()
+    cat = Altruix.get_plugin_category(p_name)
+    badge = "📦 Core / Main Plugin" if cat == "main" else "🧩 Loaded / Extra Plugin"
+    text = (
+        f"<b>Help for</b> <code>{p_name}</code>  <i>[{badge}]</i>\n\n"
+        f"{Altruix._command_help_message_data[p_name].strip()}"
+    )
+    buttons = [[custom.Button.inline("Back", f"help#_page?cat={category}&page={page}".encode("utf-8"))]]
     return text, buttons
 
 
@@ -140,7 +168,7 @@ async def help_inline(c, iq):
     builder = iq.builder
 
     if not plugin:
-        buttons = await get_help_menu()
+        buttons = await get_help_menu(category="all", page=0)
         result = builder.article(
             title="Help Menu",
             text=help_text,
@@ -149,7 +177,7 @@ async def help_inline(c, iq):
         )
         await iq.answer([result])
     elif plugin.lower() in Altruix._command_help_message_data:
-        p_text, p_buttons = await get_plugin_data(plugin.lower())
+        p_text, p_buttons = await get_plugin_data(plugin.lower(), page=0, category="all")
         result = builder.article(
             title=f"Help Module for {plugin}",
             text=p_text,
@@ -169,25 +197,32 @@ async def help_inline(c, iq):
 @log_errors
 @iuser_check
 async def re_help(c, cq):
-    buttons = await get_help_menu()
+    buttons = await get_help_menu(category="all", page=0)
     await cq.edit(help_text, buttons=buttons, parse_mode="html")
 
 
-@Altruix.bot.on_callback_query(filters.regex(r"^help(?:#(\w+)(?:\?page=(\d+))?)?$"))
+@Altruix.bot.on_callback_query(filters.regex(r"^help(?:#([a-zA-Z0-9_]+)(?:\?(.*))?)?$"))
 @log_errors
 @iuser_check
 async def help_callback(c, cq):
     data_str = cq.data.decode("utf-8") if isinstance(cq.data, bytes) else str(cq.data)
-    match = re.search(r"^help(?:#(\w+)(?:\?page=(\d+))?)?$", data_str)
+    match = re.search(r"^help(?:#([a-zA-Z0-9_]+)(?:\?(.*))?)?$", data_str)
     if not match or not match.group(1):
-        buttons = await get_help_menu()
+        buttons = await get_help_menu(category="all", page=0)
         return await cq.edit(help_text, buttons=buttons, parse_mode="html")
+
     text = match.group(1)
-    number = int(match.group(2)) if match.group(2) else 0
-    if text == "_page":
-        buttons = await get_help_menu(return_all=True)
-        return await cq.edit(help_text, buttons=buttons[number], parse_mode="html")
+    query_str = match.group(2) or ""
+    params = dict(item.split("=", 1) for item in query_str.split("&") if "=" in item)
+    category = params.get("cat", "all")
+    page = int(params.get("page", 0)) if params.get("page", "").isdigit() else 0
+
+    if text in ("_page", "_cat"):
+        buttons = await get_help_menu(category=category, page=page)
+        return await cq.edit(help_text, buttons=buttons, parse_mode="html")
+
     if text.lower() not in Altruix._command_help_message_data:
         return await cq.answer(Altruix.get_string("PLUGIN_404") or "Plugin not found")
-    p_text, p_buttons = await get_plugin_data(text, number)
+
+    p_text, p_buttons = await get_plugin_data(text, page=page, category=category)
     await cq.edit(p_text, buttons=p_buttons, parse_mode="html")

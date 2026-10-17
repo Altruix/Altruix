@@ -27,7 +27,7 @@ logger = logging.getLogger("altruix.whisper")
 )
 async def whisper_cmd(c: Client, m: Message):
     if not getattr(Altruix, "bot_info", None):
-        return await m.handle_message("❌ Assistant bot is not running; whisper requires an active assistant bot.")
+        return await m.handle_message("WHISPER_NO_BOT")
 
     chat_id = m.chat_id or (getattr(m.chat, "id", None))
     rm = m.reply_to_message or (await m.get_reply_message() if hasattr(m, "get_reply_message") else None)
@@ -54,11 +54,7 @@ async def whisper_cmd(c: Client, m: Message):
             secret_text = parts[1].strip().lstrip(",").strip()
 
     if not target or not secret_text:
-        return await m.handle_message(
-            "<b>Usage:</b>\n"
-            "• Reply to a user: <code>.whisper &lt;secret message&gt;</code>\n"
-            "• Direct mention: <code>.whisper @username &lt;secret message&gt;</code>"
-        )
+        return await m.handle_message("INPUT_REQUIRED")
 
     query_str = f"whisper {target}, {secret_text}"
 
@@ -69,7 +65,7 @@ async def whisper_cmd(c: Client, m: Message):
             # Delete original message so the secret text is completely hidden
             return await m.delete_if_self()
         else:
-            return await m.handle_message("❌ Failed to generate whisper inline button from assistant bot (0 results).")
+            return await m.handle_message("WHISPER_INLINE_FAILED")
     except errors.BotInlineDisabledError:
         try:
             from Main.internals.set_inline import set_inline_in_botfather
@@ -80,12 +76,9 @@ async def whisper_cmd(c: Client, m: Message):
                 await results[0].click(chat_id, reply_to=rm.id if rm else None)
                 return await m.delete_if_self()
         except Exception:
-            return await m.handle_message(
-                "❌ <b>Inline mode is disabled for your bot.</b>\n"
-                "Please open @BotFather, send <code>/setinline</code>, choose your bot, and set a placeholder."
-            )
+            return await m.handle_message("INLINE_DISABLED")
     except errors.ChatSendInlineForbiddenError:
-        return await m.handle_message("❌ Inline messages are not allowed in this group.")
+        return await m.handle_message("WHISPER_NO_INLINE_PERM")
     except Exception as exc:
         logger.error(f"Whisper command failed: {exc}")
         return await m.handle_message(f"❌ Whisper failed: <code>{exc}</code>")

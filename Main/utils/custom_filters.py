@@ -181,45 +181,50 @@ def user_filters(cmd: Union[str, List[str]], disable_sudo: bool = False) -> Filt
     cmd_set = {c.lower() for c in cmd}
 
     async def check(client: Any, message: Any) -> bool:
-        import Main
-        altruix = Main.Altruix
         text = getattr(message, "text", None) or getattr(message, "raw_text", None) or getattr(message, "message", None) or ""
-        if not text:
+        if not text or not isinstance(text, str) or len(text) < 2:
             return False
 
-        user_prefix = getattr(altruix, "user_command_handler", ".")
-        sudo_prefix = getattr(altruix, "sudo_cmd_handler", "!")
-        disabled_commands = getattr(altruix, "disabled_sudo_plugin_list", []) or []
-        if isinstance(disabled_commands, str):
-            disabled_commands = [item.strip() for item in disabled_commands.split(",") if item.strip()]
-        disabled_commands = {str(item).strip().lower() for item in disabled_commands}
-        sudo_disabled = disable_sudo or bool(cmd_set.intersection(disabled_commands))
-        sudo_users = [] if sudo_disabled else getattr(altruix.config, "SUDO_USERS", [])
+        import Main
+        altruix = Main.Altruix
+        user_prefix = getattr(altruix, "user_command_handler", ".") or "."
+        sudo_prefix = getattr(altruix, "sudo_cmd_handler", "!") or "!"
 
-        # Match command format: prefix + word
-        first_token = text.split()[0]
-        if not first_token:
+        first_char = text[0]
+        if first_char != user_prefix and first_char != sudo_prefix:
+            return False
+
+        first_token = text.split(None, 1)[0]
+        if len(first_token) < 2:
             return False
 
         prefix = first_token[0]
         command_name = first_token[1:].lower()
+        if command_name not in cmd_set:
+            return False
 
-        is_self = getattr(message, "out", False)
-        if not is_self and hasattr(message, "from_user") and message.from_user:
-            is_self = getattr(message.from_user, "is_self", False)
-        if not is_self and hasattr(client, "myself") and client.myself:
+        if prefix == user_prefix:
+            is_self = getattr(message, "out", False)
+            if not is_self and hasattr(message, "from_user") and message.from_user:
+                is_self = getattr(message.from_user, "is_self", False)
+            if not is_self and hasattr(client, "myself") and client.myself:
+                sender_id = getattr(message, "sender_id", None)
+                if sender_id and sender_id == client.myself.id:
+                    is_self = True
+            return is_self
+
+        if prefix == sudo_prefix and not disable_sudo:
             sender_id = getattr(message, "sender_id", None)
-            if sender_id and sender_id == client.myself.id:
-                is_self = True
+            sudo_users = getattr(altruix.config, "SUDO_USERS", []) or []
+            if not sender_id or sender_id not in sudo_users:
+                return False
 
-        # Self user commands
-        if is_self and prefix == user_prefix and command_name in cmd_set:
-            return True
-
-        # Sudo user commands
-        sender_id = getattr(message, "sender_id", None)
-        if sender_id and sender_id in sudo_users and prefix == sudo_prefix and command_name in cmd_set:
-            return True
+            disabled = getattr(altruix, "disabled_sudo_plugin_list", []) or []
+            if isinstance(disabled, str):
+                disabled_set = {x.strip().lower() for x in disabled.split(",") if x.strip()}
+            else:
+                disabled_set = {str(x).strip().lower() for x in disabled}
+            return command_name not in disabled_set
 
         return False
 

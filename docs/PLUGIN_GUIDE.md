@@ -279,7 +279,7 @@ async def share_callback(client, cq):
 
 To share plugins with other Altruix users via `.apm_install https://github.com/username/my-plugin`, create a Git repository with the following structure:
 
-### Repository Structure:
+### Monolithic Plugin Repository Structure:
 ```text
 my-altruix-plugin/
 ├── plugin.json         # Manifest metadata
@@ -287,23 +287,81 @@ my-altruix-plugin/
 └── README.md
 ```
 
-### `plugin.json` Schema:
+### Multi-Domain Segregated Repository Structure (Recommended for Large Suites):
+```text
+my-suite-plugin/
+├── plugin.json         # Manifest defining subcategories & global metadata
+├── media/              # Segregated subcategory
+│   ├── image_tool.py
+│   └── requirements.txt
+├── utilities/          # Segregated subcategory
+│   ├── qr_tool.py
+│   └── requirements.txt
+└── README.md
+```
+
+### `plugin.json` Schema (APM v3):
 ```json
 {
-  "name": "weather_plugin",
-  "version": "1.0.0",
-  "description": "Fetch real-time weather forecasts directly in Telegram.",
+  "name": "my_suite",
+  "version": "2.0.0",
+  "description": "Multi-category utility suite with domain segregation.",
   "author": "YourName",
-  "entry": "my_feature.py",
-  "dependencies": ["httpx", "geopy"]
+  "dependencies": ["httpx"],
+  "subcategories": {
+    "media": {
+      "name": "Media & Visuals",
+      "path": "media",
+      "description": "Image and video manipulation",
+      "dependencies": ["pillow"]
+    },
+    "utilities": {
+      "name": "Everyday Tools",
+      "path": "utilities",
+      "description": "QR codes and calculators",
+      "dependencies": ["qrcode"]
+    }
+  }
 }
 ```
 
 * **`name`**: Unique alphanumeric package identifier.
-* **`version`**: Semantic version string (e.g. `1.0.0`).
+* **`version`**: Semantic version string (e.g. `2.0.0`).
 * **`author`**: Developer or maintainer handle.
-* **`entry`**: Name of the `.py` script to load (if omitted, all non-underscore `.py` files in the repository are loaded).
-* **`dependencies`**: Python packages from PyPI that APM will automatically pip-install prior to loading your plugin.
+* **`dependencies`**: Global base dependencies required by all modules.
+* **`subcategories`**: Optional dictionary defining segregated domains, subfolder paths, and category-specific dependencies.
+
+### Selective Subcategory Installation:
+Users can install the entire suite or pick specific subcategories:
+```text
+# Install everything
+.apm_install https://github.com/username/my_suite
+
+# Install only the media subcategory
+.apm_install https://github.com/username/my_suite -sub media
+
+# Install multiple segregated subcategories
+.apm_install https://github.com/username/my_suite -sub media,utilities
+```
+
+### Subcategory Management Commands:
+* `.apm_sub <plugin>`: View all segregated subcategories, file counts, and enabled/disabled status.
+* `.apm_enable <plugin> <subcategory>`: Dynamically activate and hot-load a subcategory.
+* `.apm_disable <plugin> <subcategory>`: Deactivate a subcategory without deleting its files.
+* `.apm_doctor`: Run a comprehensive health check verifying Python imports and missing dependencies.
+* `.apm_repair`: Batch-install missing dependencies across all plugins with zero restarts.
+
+### Zero-Latency Startup & Pre-Boot Environment Setup:
+APM v3 eliminates startup lag by pre-flight checking Python's `find_spec` rather than invoking `pip` on every boot.
+
+To prepare a production environment (Docker, VPS, Termux, Heroku) before launching the bot:
+```bash
+# Verify and batch-install missing plugin dependencies
+python -m Main.core.apm_env_setup
+
+# Export a unified requirements.txt for deployment
+python -m Main.core.apm_env_setup --export
+```
 
 ---
 

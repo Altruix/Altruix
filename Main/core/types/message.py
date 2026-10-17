@@ -435,14 +435,14 @@ class Message(TelethonMessage):
         from Main.utils.file_helpers import make_file_from_text
 
         altruix = Main.Altruix
-        if str_val := altruix.get_string(text):
-            if "string_args" in args:
-                s_args = args.pop("string_args")
-                text = altruix.get_string(text, s_args)
-            else:
-                text = str_val
-        elif "string_args" in args:
-            s_args = args.pop("string_args")
+        s_args = args.pop("string_args", None)
+        if s_args is None and "args" in args:
+            s_args = args.pop("args")
+
+        str_val = altruix.get_string(text, string_args=s_args)
+        if str_val is not None:
+            text = str_val
+        elif s_args is not None:
             with suppress_error(msg="edit_msg string formatting"):
                 text = text.format(*s_args) if isinstance(s_args, (list, tuple)) else text.format(s_args)
 
@@ -513,14 +513,14 @@ class Message(TelethonMessage):
         from Main.utils.file_helpers import make_file_from_text
 
         altruix = Main.Altruix
-        if str_val := altruix.get_string(text):
-            if "string_args" in args:
-                s_args = args.pop("string_args")
-                text = altruix.get_string(text, s_args)
-            else:
-                text = str_val
-        elif "string_args" in args:
-            s_args = args.pop("string_args")
+        s_args = args.pop("string_args", None)
+        if s_args is None and "args" in args:
+            s_args = args.pop("args")
+
+        str_val = altruix.get_string(text, string_args=s_args)
+        if str_val is not None:
+            text = str_val
+        elif s_args is not None:
             with suppress_error(msg="reply_msg string formatting"):
                 text = text.format(*s_args) if isinstance(s_args, (list, tuple)) else text.format(s_args)
 
@@ -565,6 +565,13 @@ class Message(TelethonMessage):
             with suppress_error(msg="reply_msg auto delete"):
                 await msg.delete()
         return enrich_message(msg, self.client)
+
+    async def delete_msg(self, *args, **kwargs) -> Any:
+        """Compatibility alias for delete() ensuring plugins calling delete_msg() succeed."""
+        try:
+            return await self.delete(*args, **kwargs)
+        except Exception:
+            return None
 
     async def reply_file(
         self,

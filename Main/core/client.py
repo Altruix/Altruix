@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import glob
 import html
@@ -42,9 +43,8 @@ from Main.core.cache import Cache
 from Main.utils.paste import Paste
 from ..utils._updater import Updater
 from .config import Config, BaseConfig
-from ..utils.essentials import Essentials
 from ..utils.suppress import suppress_error, safe_suppress, suppress
-from .database import MongoDB, LocalDatabase
+from .database import MongoDB, LocalDatabase, create_database
 from .plugin_manager import PluginManager
 from .types.client import AltruixTelegramClient
 from .types.message import Message, enrich_message
@@ -92,6 +92,14 @@ class BotWrapper:
             return func
         return decorator
 
+    def on(self, event: Any = None):
+        def decorator(func: Callable):
+            self._altruix._pending_bot_handlers.append(("telethon_event", event, func))
+            if self._altruix._raw_bot is not None:
+                self._altruix._register_bot_handler("telethon_event", event, func)
+            return func
+        return decorator
+
 
 class AltruixClient:
     def __init__(self, *args, **kwargs) -> None:
@@ -119,6 +127,9 @@ class AltruixClient:
         self._mongo_db: Optional[MongoDB] = None
         self.config: Config = Config(self.local_db.env_col, executor=self.executor)
         self.log_chat = None
+        self.main_plugins: set[str] = set()
+        self.extra_plugins: set[str] = set()
+        self.plugin_categories: Dict[str, str] = {}
         self._command_help_message_data: Dict[str, str] = {}
         self._pending_handlers: List[Dict[str, Any]] = []
         self._pending_bot_handlers: List[Tuple[str, Optional[Filter], Callable]] = []
@@ -211,13 +222,14 @@ class AltruixClient:
         await self.resolve_dns()
         if self.config.DB_URI:
             try:
-                self.db = MongoDB(self.config.DB_URI, db_name=self.config.DB_NAME or "Altruix")
-                self.log("Initialized Mongo successfully!")
+                self.db = create_database(self.config.DB_URI, db_name=self.config.DB_NAME or "Altruix")
+                backend_name = type(self.db).__name__
+                self.log(f"Initialized Database ({backend_name}) successfully!")
                 if not await self.db.ping():
-                    raise ConnectionError("MongoDB did not respond to the ping command")
-                self.log("Pinged Mongo successfully!")
+                    raise ConnectionError(f"{backend_name} did not respond to the ping command")
+                self.log(f"Pinged {backend_name} successfully!")
             except Exception as e:
-                self.log(f"Mongo connection failed: {e}. Falling back to local storage.", level=logging.WARNING)
+                self.log(f"Database connection failed: {e}. Falling back to local storage.", level=logging.WARNING)
                 self.db = None
         else:
             self.log("No DB_URI provided. Running with local configuration.", level=logging.INFO)
@@ -257,19 +269,30 @@ class AltruixClient:
             self.selected_lang = "english"
         self.log("Localization setup complete!")
 
-    def get_string(self, keyword: str, args: Any = None) -> Optional[str]:
-        selected_lang = self.selected_lang
-        lang_dict = self.all_lang_strings.get(selected_lang) or self.all_lang_strings.get("english", {})
-        if lang_dict and lang_dict.get(keyword):
-            str_ing = lang_dict.get(keyword)
-            if args:
-                return (
-                    str_ing.format(*args)
-                    if isinstance(args, (tuple, list))
-                    else str_ing.format(args)
-                )
+    def get_string(self, keyword: str, *args: Any, string_args: Any = None, **kwargs: Any) -> Optional[str]:
+        # Lookup in selected language, fallback to english
+        str_ing = None
+        for lang_name in (self.selected_lang, "english"):
+            lang_dict = self.all_lang_strings.get(lang_name)
+            if lang_dict and isinstance(lang_dict, dict) and keyword in lang_dict:
+                str_ing = lang_dict[keyword]
+                break
+
+        if str_ing is None or not isinstance(str_ing, str):
             return str_ing
-        return None
+
+        fmt_args = string_args if string_args is not None else (args if args else None)
+        if fmt_args is not None or kwargs:
+            try:
+                if fmt_args is not None and kwargs:
+                    return str_ing.format(*fmt_args, **kwargs) if isinstance(fmt_args, (list, tuple)) else str_ing.format(fmt_args, **kwargs)
+                elif fmt_args is not None:
+                    return str_ing.format(*fmt_args) if isinstance(fmt_args, (list, tuple)) else str_ing.format(fmt_args)
+                elif kwargs:
+                    return str_ing.format(**kwargs)
+            except Exception:
+                return str_ing
+        return str_ing
 
     def on_message(self, custom_filters: Any = None, group: int = 1, bot_mode_unsupported: bool = False):
         def decorator(func: Callable):
@@ -349,70 +372,122 @@ class AltruixClient:
 
         if h_type == "cmd":
             cmd = handler_info["cmd"]
-            filter_check = user_filters(cmd)
-            requires_input = handler_info["requires_input"]
-            requires_reply = handler_info["requires_reply"]
-            group_only = handler_info["group_only"]
-            channel_only = handler_info["channel_only"]
-            pm_only = handler_info["pm_only"]
-            just_exc = handler_info["just_exc"]
-            file_name = handler_info["file_name"]
+            cmd_aliases = [cmd] if isinstance(cmd, str) else cmd
 
-            async def event_callback(event: events.NewMessage.Event):
-                message = enrich_message(event, client)
-                if not await filter_check(client, message):
-                    return
+            if not hasattr(client, "_cmd_handlers_map"):
+                client._cmd_handlers_map = {}
 
-                # Fetch replied message if available
-                if message.is_reply or message.reply_to_msg_id:
-                    with suppress_error(msg="Fetching replied message"):
-                        reply = None
-                        if hasattr(message, "get_reply_message"):
-                            reply = await message.get_reply_message()
-                        if not reply and hasattr(event, "message") and hasattr(event.message, "get_reply_message"):
-                            reply = await event.message.get_reply_message()
-                        if not reply and message.reply_to_msg_id:
-                            reply = await client.get_messages(message.chat_id, ids=message.reply_to_msg_id)
-                        if reply:
-                            message.reply_to_message = enrich_message(reply, client)
+            for alias in cmd_aliases:
+                client._cmd_handlers_map[str(alias).strip().lower()] = handler_info
 
-                chat_type = getattr(message.chat, "type", "")
-                user_inp = message.user_input
-                if requires_input and not user_inp:
-                    return await message.handle_message("INPUT_REQUIRED")
-                if requires_reply and not message.reply_to_message:
-                    return await message.handle_message("REPLY_REQUIRED")
-                if group_only and chat_type not in {"supergroup", "group"}:
-                    return await message.handle_message("GROUP_ONLY")
-                if channel_only and chat_type != "channel":
-                    return await message.handle_message("CHANNEL_ONLY")
-                if pm_only and chat_type != "private":
-                    return await message.handle_message("PM_ONLY")
+            if not getattr(client, "_cmd_router_attached", False):
+                client._cmd_router_attached = True
 
-                if just_exc:
-                    await func(client, message)
-                else:
-                    try:
-                        await func(client, message)
-                    except errors.MessageNotModifiedError:
-                        pass
-                    except Exception as exc:
-                        tb = traceback.format_exc()
-                        cmd_str = cmd[0] if isinstance(cmd, list) else cmd
-                        logger.error(f"[{file_name}] Unhandled exception in '{cmd_str}':\n{tb}")
-                        err_name = exc.__class__.__name__
-                        err_detail = str(exc) or err_name
-                        err_text = f"❌ <b>Error ({file_name}):</b> <code>{html.escape(err_detail[:300])}</code>"
-                        last_msg = getattr(message, "_last_handled_msg", None)
-                        if last_msg is not None:
-                            with suppress_error(msg="Update processing message on failure"):
-                                await last_msg.edit_msg(err_text)
-                        else:
-                            with suppress_error(msg="Send error notice on failure"):
-                                await message.handle_message(err_text)
-                        await self.send_error(client, cmd, tb, file_name=file_name)
+                async def cmd_router_callback(event: events.NewMessage.Event):
+                    raw_text = getattr(event, "raw_text", None) or getattr(event, "message", None) or ""
+                    if not raw_text or not isinstance(raw_text, str):
+                        return
 
-            client.add_event_handler(event_callback, events.NewMessage())
+                    user_p = getattr(self, "user_command_handler", ".") or "."
+                    sudo_p = getattr(self, "sudo_cmd_handler", "!") or "!"
+
+                    first_char = raw_text[0]
+                    if first_char != user_p and first_char != sudo_p:
+                        return
+
+                    parts = raw_text.split(None, 1)
+                    if not parts or len(parts[0]) <= 1:
+                        return
+
+                    prefix = parts[0][0]
+                    cmd_name = parts[0][1:].lower()
+
+                    handler_entry = client._cmd_handlers_map.get(cmd_name)
+                    if not handler_entry:
+                        return
+
+                    is_self = getattr(event, "out", False)
+                    if not is_self and hasattr(client, "myself") and client.myself:
+                        if getattr(event, "sender_id", None) == client.myself.id:
+                            is_self = True
+
+                    sender_id = getattr(event, "sender_id", None)
+                    sudo_users = getattr(self.config, "SUDO_USERS", []) or []
+
+                    if prefix == user_p:
+                        if not is_self:
+                            return
+                    elif prefix == sudo_p:
+                        if not sender_id or sender_id not in sudo_users:
+                            return
+                        disabled = getattr(self, "disabled_sudo_plugin_list", []) or []
+                        if isinstance(disabled, (list, tuple, set)) and cmd_name in {str(x).lower() for x in disabled}:
+                            return
+                    else:
+                        return
+
+                    message = enrich_message(event, client)
+
+                    requires_input = handler_entry["requires_input"]
+                    requires_reply = handler_entry["requires_reply"]
+                    group_only = handler_entry["group_only"]
+                    channel_only = handler_entry["channel_only"]
+                    pm_only = handler_entry["pm_only"]
+                    just_exc = handler_entry["just_exc"]
+                    file_name = handler_entry["file_name"]
+                    cmd_list = handler_entry["cmd"]
+                    h_func = handler_entry["func"]
+
+                    if message.is_reply or message.reply_to_msg_id:
+                        with suppress_error(msg="Fetching replied message"):
+                            reply = None
+                            if hasattr(message, "get_reply_message"):
+                                reply = await message.get_reply_message()
+                            if not reply and hasattr(event, "message") and hasattr(event.message, "get_reply_message"):
+                                reply = await event.message.get_reply_message()
+                            if not reply and message.reply_to_msg_id:
+                                chat_target = getattr(message, "input_chat", None) or getattr(event, "input_chat", None) or message.chat_id
+                                reply = await client.get_messages(chat_target, ids=message.reply_to_msg_id)
+                            if reply:
+                                message.reply_to_message = enrich_message(reply, client)
+
+                    chat_type = getattr(message.chat, "type", "")
+                    user_inp = message.user_input
+                    if requires_input and not user_inp:
+                        return await message.handle_message("INPUT_REQUIRED")
+                    if requires_reply and not message.reply_to_message:
+                        return await message.handle_message("REPLY_REQUIRED")
+                    if group_only and chat_type not in {"supergroup", "group"}:
+                        return await message.handle_message("GROUP_ONLY")
+                    if channel_only and chat_type != "channel":
+                        return await message.handle_message("CHANNEL_ONLY")
+                    if pm_only and chat_type != "private":
+                        return await message.handle_message("PM_ONLY")
+
+                    if just_exc:
+                        await h_func(client, message)
+                    else:
+                        try:
+                            await h_func(client, message)
+                        except errors.MessageNotModifiedError:
+                            pass
+                        except Exception as exc:
+                            tb = traceback.format_exc()
+                            cmd_str = cmd_list[0] if isinstance(cmd_list, list) else cmd_list
+                            logger.error(f"[{file_name}] Unhandled exception in '{cmd_str}':\n{tb}")
+                            err_name = exc.__class__.__name__
+                            err_detail = str(exc) or err_name
+                            err_text = f"❌ <b>Error ({file_name}):</b> <code>{html.escape(err_detail[:300])}</code>"
+                            last_msg = getattr(message, "_last_handled_msg", None)
+                            if last_msg is not None:
+                                with suppress_error(msg="Update processing message on failure"):
+                                    await last_msg.edit_msg(err_text)
+                            else:
+                                with suppress_error(msg="Send error notice on failure"):
+                                    await message.handle_message(err_text)
+                            await self.send_error(client, cmd_list, tb, file_name=file_name)
+
+                client.add_event_handler(cmd_router_callback, events.NewMessage())
 
         elif h_type == "custom":
             cust_filter = handler_info["filter"]
@@ -498,6 +573,9 @@ class AltruixClient:
                     return
                 await func(self._raw_bot, event)
             self._raw_bot.add_event_handler(iq_cb, events.InlineQuery())
+
+        elif handler_type == "telethon_event":
+            self._raw_bot.add_event_handler(func, custom_filter)
 
     def add_help_to_command_list(
         self,
@@ -652,13 +730,32 @@ class AltruixClient:
         """Compatibility entry point used by the updater."""
         await self.reboot(**kwargs)
 
-    async def load_from_directory(self, path_pattern: str, log: bool = True, msg: Any = None) -> None:
+    async def load_from_directory(self, path_pattern: str, log: bool = True, msg: Any = None, category: Optional[str] = None) -> None:
         helper_scripts = glob.glob(path_pattern, recursive=True)
         if not helper_scripts:
             return
+        clean_pat = path_pattern.replace("\\", "/").lower()
+        if category:
+            cat = category
+        elif any(k in clean_pat for k in ("plugins/userbot", "plugins/bot", "internals", "utils")):
+            cat = "main"
+        else:
+            cat = "loaded"
+
         for file_path in helper_scripts:
             path_obj = Path(file_path)
             plugin_name = path_obj.stem
+            if plugin_name == "__init__":
+                continue
+            p_name = plugin_name.lower()
+            self.plugin_categories[p_name] = cat
+            if cat == "main":
+                self.main_plugins.add(p_name)
+                self.extra_plugins.discard(p_name)
+            else:
+                self.extra_plugins.add(p_name)
+                self.main_plugins.discard(p_name)
+
             module_name = f"Main.{path_obj.parent.name}.{plugin_name}"
             spec = importlib.util.spec_from_file_location(module_name, file_path)
             if spec and spec.loader:
@@ -686,8 +783,46 @@ class AltruixClient:
         self.log("All internal modules loaded.")
         await self.load_from_directory("Main/plugins/bot/*.py", log=True)
         await self.load_from_directory("Main/plugins/userbot/*.py", log=True)
-        # Load externally installed plugins
-        await self.load_from_directory("Main/plugins/external/**/*.py", log=True)
+        # Load externally installed plugins respecting segregation & quarantine status
+        if self.plugin_manager and self.plugin_manager._installed:
+            for pname, manifest in self.plugin_manager._installed.items():
+                if manifest.enabled and not manifest.quarantined:
+                    pdir = self.plugin_manager.PLUGIN_DIR / pname
+                    if pdir.is_dir():
+                        await self.plugin_manager._load_plugin_modules(manifest, pdir)
+                    elif (self.plugin_manager.PLUGIN_DIR / f"{pname}.py").exists():
+                        await self.load_from_directory(str(self.plugin_manager.PLUGIN_DIR / f"{pname}.py"), log=True)
+        else:
+            await self.load_from_directory("Main/plugins/external/**/*.py", log=True)
+
+        # Auto-sync extra plugin repos from GitHub if configured
+        load_xtra = os.environ.get("LOAD_XTRA_PLUGINS", "").strip().lower() in ("true", "1", "yes", "enable")
+        if not load_xtra and self.config and hasattr(self.config, "LOAD_XTRA_PLUGINS"):
+            load_xtra = bool(self.config.LOAD_XTRA_PLUGINS)
+        if load_xtra:
+            try:
+                from Main.core.apm_env_setup import sync_xtra_plugins_repos
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, sync_xtra_plugins_repos)
+            except Exception as e:
+                self.log(f"Error syncing extra plugins: {e}", level=logging.WARNING)
+
+        # Auto-load workspace development & extra plugin suites if present locally
+        suites = {"XtraPlugins", "XtraPluginsAI"}
+        configured_repos = os.environ.get("XTRA_PLUGINS_REPOS", "")
+        if configured_repos:
+            for r in re.split(r"[\s,;]+", configured_repos):
+                r_name = r.rstrip("/").split("/")[-1].replace(".git", "")
+                if r_name:
+                    suites.add(r_name)
+
+        for suite in suites:
+            candidates = [Path(f"./{suite}"), Path(f"./plug/{suite}")]
+            for suite_dir in candidates:
+                if suite_dir.is_dir() and not (self.plugin_manager and suite in self.plugin_manager._installed):
+                    await self.load_from_directory(f"{suite_dir.as_posix()}/*.py", log=True)
+                    await self.load_from_directory(f"{suite_dir.as_posix()}/**/*.py", log=True)
+
         self.prepare_help()
         self.log("All plugins loaded.")
 
@@ -715,6 +850,24 @@ class AltruixClient:
                         arg_help = arg.get("help", "")
                         req = " <i>[input required]</i>" if arg.get("requires_input", False) else ""
                         self._command_help_message_data[p_name] += f"  • <code>-{arg_name}</code>: {arg_help}{req}\n"
+
+    def get_plugin_category(self, plugin_name: str) -> str:
+        p_name = plugin_name.lower()
+        if p_name in self.extra_plugins:
+            return "loaded"
+        if p_name in self.main_plugins:
+            return "main"
+        return self.plugin_categories.get(p_name, "main")
+
+    def get_plugins_by_category(self) -> Tuple[List[str], List[str]]:
+        main_list: List[str] = []
+        loaded_list: List[str] = []
+        for p in sorted(self._command_help_message_data.keys()):
+            if self.get_plugin_category(p) == "loaded":
+                loaded_list.append(p)
+            else:
+                main_list.append(p)
+        return main_list, loaded_list
 
     async def send_error(
         self,

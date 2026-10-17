@@ -50,7 +50,7 @@ async def tts_now(c, m):
     if input_ and langs_.get(input_.lower()):
         lang_ = input_.lower()
     elif not langs_.get(lang_):
-        await msg_.edit("INVALID_LANG")
+        await msg_.edit_msg("INVALID_LANG")
         lang_ = "en"
     file_ = await tts_(rm.text, lang_)
     await m.reply_voice(
@@ -85,9 +85,9 @@ async def translate_(c, m):
         lang_to = input_[0]
         from_lang = input_[1] if len(input_) != 1 else "auto"
     if not LANGUAGES.get(lang_to.lower()):
-        return await _m_.edit_msg("LANGUAGE_NOT_SUPPORTED", string_args=(lang_to))
+        return await _m_.edit_msg("LANGUAGE_NOT_SUPPORTED", string_args=(lang_to,))
     if from_lang != "auto" and not LANGUAGES.get(from_lang.lower()):
-        return await _m_.edit_msg("LANGUAGE_NOT_SUPPORTED", string_args=(from_lang))
+        return await _m_.edit_msg("LANGUAGE_NOT_SUPPORTED", string_args=(from_lang,))
     translation = await translate_now(
         to_tr, src=from_lang.lower(), dest=lang_to.lower()
     )

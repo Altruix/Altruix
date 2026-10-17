@@ -173,7 +173,7 @@ async def broadcast(c: Client, m: Message):
 
     # Otherwise broadcast to all saved chats in DB
     if Altruix.db is None:
-        return await msg.edit("No database connected and no target chat specified.")
+        return await msg.edit_msg("BROADCAST_NO_DB")
 
     bcast_db = Altruix.db.make_collection("Broadcast")
     chats = []
@@ -181,7 +181,7 @@ async def broadcast(c: Client, m: Message):
         chats.append(x["chat_id"])
 
     if not chats:
-        return await msg.edit("No chats saved in broadcast database.")
+        return await msg.edit_msg("<b>No chats saved in broadcast database.</b>")
 
     success = 0
     err = 0
@@ -192,7 +192,4 @@ async def broadcast(c: Client, m: Message):
         except Exception:
             err += 1
 
-    await msg.edit(
-        f"📢 Broadcast finished: sent to <code>{success}</code> chats (errors: <code>{err}</code>)!",
-        parse_mode="html",
-    )
+    await msg.edit_msg("BROADCAST_DONE", string_args=(success, err))

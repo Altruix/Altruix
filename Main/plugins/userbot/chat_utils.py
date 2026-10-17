@@ -55,7 +55,7 @@ async def set_chat_pic_cmd_handler(c: Client, m: Message):
         file_path = await reply.download_media("cache/")
         try:
             await c.set_chat_photo(m.chat.id, file_path)
-            await msg.edit("<b>Chat photo updated!</b>", parse_mode="html")
+            await msg.edit_msg("CHAT_PHOTO_UPDATED")
         except Exception as be:
             name, err = await Paste(str(be)).paste()
             await msg.edit_msg("ERROR_", string_args=(name, err))

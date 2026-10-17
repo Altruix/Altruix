@@ -29,19 +29,20 @@ def convertor_(input_file: str, w: int, h: int) -> str:
     """Convert raw video to webm sticker using ffmpeg if installed."""
     if not shutil.which("ffmpeg"):
         raise RuntimeError("FFmpeg is not installed on this system.")
-    import ffmpeg
+    import subprocess
     out_file = f"{os.path.splitext(input_file)[0]}.webm"
-    ffmpeg.input(input_file).output(
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", "0:00:00", "-to", "0:00:03",
+        "-i", input_file,
+        "-vf", f"scale={h}:{w}",
+        "-c:v", "libvpx-vp9",
+        "-pix_fmt", "yuv420p",
+        "-crf", "28",
+        "-loglevel", "error",
         out_file,
-        vcodec="libvpx-vp9",
-        pix_fmt="yuv420p",
-        crf=28,
-        preset="veryfast",
-        vf=f"scale={h}:{w}",
-        ss="0:00:00",
-        to="0:00:03",
-        loglevel="error",
-    ).overwrite_output().run()
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if os.path.exists(input_file):
         os.remove(input_file)
     return out_file

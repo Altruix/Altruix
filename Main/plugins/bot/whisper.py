@@ -38,9 +38,10 @@ async def whisper(c, iq):
     MSGS_DICT[int(_id)] = dict(user=user, msg=msg.strip())
 
     builder = iq.builder
+    w_text = Altruix.get_string("WHISPER", user=user_trail) or f"<b>A Whisper Has Been Sent For {user_trail}</b>\nClick Below To Check Message!\n<i>Note: Only the recipient can open it!</i>"
     result = builder.article(
         title=f"Whisper to {user_trail}",
-        text=f"<b>A Whisper Has Been Sent For {user_trail}</b>\nClick Below To Check Message!\n<i>Note: Only the recipient can open it!</i>",
+        text=w_text,
         parse_mode="html",
         buttons=[[custom.Button.inline("Show Message", f"whisper_{_id}".encode("utf-8"))]],
     )

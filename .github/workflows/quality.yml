@@ -19,4 +19,4 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile Python modules
-        run: python -m compileall -q Main
+        run: python -m compileall -q Main tests style.py

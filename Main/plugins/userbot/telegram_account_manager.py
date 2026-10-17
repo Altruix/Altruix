@@ -134,7 +134,8 @@ async def account_modify(c: Client, m: Message):
         fname = parts[0]
         lname = parts[1] if len(parts) > 1 else ""
         await c(functions.account.UpdateProfileRequest(first_name=fname, last_name=lname))
-        return await msg.edit_msg(f"<b>Profile name updated:</b> <code>{fname} {lname}</code>".strip())
+        full_name = f"{fname} {lname}".strip()
+        return await msg.edit_msg(f"✅ Successfully updated profile name to: <b>{full_name}</b>")
 
     # 3. UPDATE FIRST NAME: -f First
     if "f" in args or "-f" in args:
@@ -142,7 +143,7 @@ async def account_modify(c: Client, m: Message):
             return await msg.edit_msg("INPUT_REQUIRED")
         fname = m.user_input
         await c(functions.account.UpdateProfileRequest(first_name=fname))
-        return await m.handle_message(Altruix.get_string("CHANGE", args=("FirstName", fname)) or f"First name set to <code>{fname}</code>")
+        return await msg.edit_msg("CHANGE", string_args=("FirstName", fname))
 
     # 4. UPDATE LAST NAME: -l Last
     if "l" in args or "-l" in args:
@@ -150,7 +151,7 @@ async def account_modify(c: Client, m: Message):
             return await msg.edit_msg("INPUT_REQUIRED")
         lname = m.user_input
         await c(functions.account.UpdateProfileRequest(last_name=lname))
-        return await m.handle_message(Altruix.get_string("CHANGE", args=("LastName", lname)) or f"Last name set to <code>{lname}</code>")
+        return await msg.edit_msg("CHANGE", string_args=("LastName", lname))
 
     # 5. UPDATE BIO / ABOUT: -b text or -b clear
     if "b" in args or "-b" in args:
@@ -158,7 +159,7 @@ async def account_modify(c: Client, m: Message):
             return await msg.edit_msg("INPUT_REQUIRED")
         bio = "" if m.user_input.strip().lower() in ("clear", "none", "off", "rm") else m.user_input
         await c(functions.account.UpdateProfileRequest(about=bio))
-        return await msg.edit_msg(f"<b>Bio updated:</b> <i>{bio or 'Cleared'}</i>")
+        return await msg.edit_msg(f"📝 Bio updated: <b>{bio or 'Cleared'}</b>")
 
     # 6. UPDATE USERNAME: -u username or -u clear
     if "u" in args or "-u" in args:
@@ -167,19 +168,17 @@ async def account_modify(c: Client, m: Message):
         raw_u = m.user_input.replace("@", "").strip()
         if raw_u.lower() in ("clear", "none", "off", "rm"):
             await c(functions.account.UpdateUsernameRequest(username=""))
-            return await msg.edit_msg("<b>Username cleared successfully.</b>")
+            return await msg.edit_msg("USERNAME_CLEARED")
         try:
             check = await c(functions.account.CheckUsernameRequest(username=raw_u))
             if not check:
-                return await msg.edit_msg(
-                    Altruix.get_string("USERNAME_TAKEN", args=(f"@{raw_u}",)) or f"❌ Username @{raw_u} is taken."
-                )
+                return await msg.edit_msg("USERNAME_TAKEN", string_args=(f"@{raw_u}",))
             await c(functions.account.UpdateUsernameRequest(username=raw_u))
-            return await msg.edit_msg(f"<b>Username updated to:</b> <code>@{raw_u}</code>")
+            return await msg.edit_msg("USERNAME_UPDATED", string_args=(raw_u,))
         except errors.UsernameInvalidError:
-            return await msg.edit_msg("❌ <b>The specified username is invalid.</b>")
+            return await msg.edit_msg("USERNAME_INVALID")
         except errors.UsernameOccupiedError:
-            return await msg.edit_msg(f"❌ <b>Username @{raw_u} is already occupied.</b>")
+            return await msg.edit_msg("USERNAME_OCCUPIED", string_args=(raw_u,))
 
     # 7. UPDATE PROFILE PHOTO: -p (replying to photo)
     if "p" in args or "-p" in args:
@@ -191,11 +190,11 @@ async def account_modify(c: Client, m: Message):
         temp_pic_path = os.path.join(temp_dir, f"temp_profile_{int(time.time() * 1000)}.jpg")
         pic = await c.download_media(rm, file=temp_pic_path)
         if not pic or not os.path.exists(pic):
-            return await msg.edit_msg("❌ <b>Could not download image. Please reply to a valid photo or image file.</b>")
+            return await msg.edit_msg("404_FILE_NOT_FOUND")
         try:
             uploaded = await c.upload_file(pic)
             await c(functions.photos.UploadProfilePhotoRequest(file=uploaded))
-            return await msg.edit_msg(Altruix.get_string("CHNG_PHOTO") or "<b>Profile photo updated successfully!</b>")
+            return await msg.edit_msg("CHNG_PHOTO")
         finally:
             if pic and os.path.exists(pic):
                 os.remove(pic)
@@ -208,8 +207,8 @@ async def account_modify(c: Client, m: Message):
             await c(functions.photos.DeletePhotosRequest(
                 id=[types.InputPhoto(id=p.id, access_hash=p.access_hash, file_reference=p.file_reference)]
             ))
-            return await msg.edit_msg("<b>Profile photo removed successfully!</b>")
-        return await msg.edit_msg("<b>No profile photo found to remove.</b>")
+            return await msg.edit_msg("PROFILE_PHOTO_REMOVED")
+        return await msg.edit_msg("NO_PROFILE_PHOTO")
 
     # 9. SELF-DESTRUCT TTL: -ttl <days>
     if "ttl" in args or "-ttl" in args:
@@ -220,7 +219,7 @@ async def account_modify(c: Client, m: Message):
                 closest = min(valid_days, key=lambda x: abs(x - days))
                 days = closest
             await c(functions.account.SetAccountTTLRequest(ttl=types.AccountDaysTTL(days=days)))
-            return await msg.edit_msg(f"<b>Account self-destruct TTL set to:</b> <code>{days} days</code>")
+            return await msg.edit_msg("TTL_UPDATED", string_args=(days,))
         ttl_res = await c(functions.account.GetAccountTTLRequest())
         return await msg.edit_msg(
             f"<b>Current Account Self-Destruct TTL:</b> <code>{ttl_res.days} days</code>\n\n"
@@ -246,19 +245,19 @@ async def account_modify(c: Client, m: Message):
     if "ts" in args or "-ts" in args:
         try:
             await c(functions.auth.ResetAuthorizationsRequest())
-            return await msg.edit_msg("<b>All other active login sessions have been terminated successfully.</b>")
+            return await msg.edit_msg("🔒 All other sessions terminated successfully.")
         except Exception as e:
-            return await msg.edit_msg(f"❌ <b>Unable to terminate sessions:</b> <code>{e}</code>")
+            return await msg.edit_msg("SESSIONS_TERMINATE_FAILED", string_args=(str(e),))
 
     # 12. SENSITIVE CONTENT TOGGLE: -sensitive on|off
     if "sensitive" in args or "-sensitive" in args or "nsfw" in args or "-nsfw" in args:
         val_str = (m.user_input or "").strip().lower()
         if val_str in ("on", "true", "1", "enable"):
             await c(functions.account.SetContentSettingsRequest(sensitive_enabled=True))
-            return await msg.edit_msg("<b>Sensitive content filter disabled:</b> <code>18+ media is now displayed.</code>")
+            return await msg.edit_msg("🔞 Sensitive content filter disabled (showing 18+ content).")
         elif val_str in ("off", "false", "0", "disable"):
             await c(functions.account.SetContentSettingsRequest(sensitive_enabled=False))
-            return await msg.edit_msg("<b>Sensitive content filter enabled:</b> <code>18+ media is now filtered.</code>")
+            return await msg.edit_msg("🛡 Sensitive content filter enabled (filtering 18+ content).")
         else:
             c_res = await c(functions.account.GetContentSettingsRequest())
             curr = "Enabled (Showing 18+ content)" if getattr(c_res, "sensitive_enabled", False) else "Disabled (Filtering 18+ content)"
@@ -274,12 +273,12 @@ async def account_modify(c: Client, m: Message):
             await c(functions.account.SetGlobalPrivacySettingsRequest(
                 settings=types.GlobalPrivacySettings(archive_and_mute_new_noncontact_peers=True)
             ))
-            return await msg.edit_msg("<b>Auto-archive enabled:</b> <code>New chats from non-contacts will be muted and archived.</code>")
+            return await msg.edit_msg("📦 Auto-archive enabled for new non-contact chats.")
         elif val_str in ("off", "false", "0", "disable"):
             await c(functions.account.SetGlobalPrivacySettingsRequest(
                 settings=types.GlobalPrivacySettings(archive_and_mute_new_noncontact_peers=False)
             ))
-            return await msg.edit_msg("<b>Auto-archive disabled:</b> <code>New chats will appear in main chat list.</code>")
+            return await msg.edit_msg("📦 Auto-archive disabled for new non-contact chats.")
         else:
             g_res = await c(functions.account.GetGlobalPrivacySettingsRequest())
             curr = "Enabled" if getattr(g_res, "archive_and_mute_new_noncontact_peers", False) else "Disabled"
@@ -293,10 +292,10 @@ async def account_modify(c: Client, m: Message):
         val_str = (m.user_input or "").strip().lower()
         if val_str in ("off", "mute", "silent", "disable"):
             await c(functions.account.SetContactSignUpNotificationRequest(silent=True))
-            return await msg.edit_msg("<b>Contact joined alerts:</b> <code>Muted (no notification when a contact joins).</code>")
+            return await msg.edit_msg("🔕 Contact joined alerts: Disabled")
         elif val_str in ("on", "active", "enable"):
             await c(functions.account.SetContactSignUpNotificationRequest(silent=False))
-            return await msg.edit_msg("<b>Contact joined alerts:</b> <code>Active (you will be notified when a contact joins).</code>")
+            return await msg.edit_msg("🔔 Contact joined alerts: Enabled")
         else:
             s_res = await c(functions.account.GetContactSignUpNotificationRequest())
             curr = "Muted" if getattr(s_res, "silent", False) else "Active"
@@ -312,16 +311,16 @@ async def account_modify(c: Client, m: Message):
         target = m.user_input.strip()
         if target.lower() in ("off", "none", "clear", "rm"):
             await c(functions.account.UpdatePersonalChannelRequest(channel=types.InputChannelEmpty()))
-            return await msg.edit_msg("<b>Personal channel removed from profile.</b>")
+            return await msg.edit_msg("PERSONAL_CHANNEL_REMOVED")
         try:
             ent = await c.get_input_entity(target)
             if not isinstance(ent, (types.InputChannel, types.InputPeerChannel)):
-                return await msg.edit_msg("❌ <b>The specified target must be a broadcast channel you own.</b>")
+                return await msg.edit_msg("CHANNEL_ONLY")
             channel_input = types.InputChannel(channel_id=ent.channel_id, access_hash=ent.access_hash)
             await c(functions.account.UpdatePersonalChannelRequest(channel=channel_input))
-            return await msg.edit_msg(f"<b>Personal channel updated to:</b> <code>{target}</code>")
+            return await msg.edit_msg("PERSONAL_CHANNEL_UPDATED", string_args=(target,))
         except Exception as e:
-            return await msg.edit_msg(f"❌ <b>Unable to set personal channel:</b> <code>{e}</code>")
+            return await msg.edit_msg("FAILED_TRANSFER", string_args=(str(e),))
 
     # 16. BIRTHDAY: -bday DD MM [YYYY] or -bday off
     if "bday" in args or "-bday" in args or "birthday" in args or "-birthday" in args:
@@ -330,19 +329,19 @@ async def account_modify(c: Client, m: Message):
         target = m.user_input.strip()
         if target.lower() in ("off", "none", "clear", "rm"):
             await c(functions.account.UpdateBirthdayRequest(birthday=None))
-            return await msg.edit_msg("<b>Birthday removed from profile.</b>")
+            return await msg.edit_msg("BDAY_REMOVED")
         parts = target.replace("/", " ").replace("-", " ").split()
         if len(parts) < 2 or not all(p.isdigit() for p in parts[:2]):
-            return await msg.edit_msg("❌ <b>Invalid format.</b> Use: <code>-bday DD MM [YYYY]</code> (e.g. <code>-bday 15 08 2000</code> or <code>-bday off</code>)")
+            return await msg.edit_msg("INVALID_INPUT")
         day = int(parts[0])
         month = int(parts[1])
         year = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else None
         try:
             await c(functions.account.UpdateBirthdayRequest(birthday=types.Birthday(day=day, month=month, year=year)))
             y_str = f"/{year}" if year else ""
-            return await msg.edit_msg(f"<b>Birthday set to:</b> <code>{day:02d}/{month:02d}{y_str}</code>")
+            return await msg.edit_msg(f"🎂 Birthday set to: <b>{day:02d}/{month:02d}{y_str}</b>")
         except Exception as e:
-            return await msg.edit_msg(f"❌ <b>Unable to update birthday:</b> <code>{e}</code>")
+            return await msg.edit_msg("INVALID_INPUT")
 
     # 17. PRIVACY OVERVIEW: -privacy
     if "privacy" in args or "-privacy" in args:

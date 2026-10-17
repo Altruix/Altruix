@@ -109,14 +109,29 @@ async def help_normal(c: Client, m: Message):
     notice = f"⚠️ <i>Inline menu unavailable: {html.escape(bot_reason)}</i>\n\n" if bot_reason and "-basic" not in m.user_args and not is_bot else ""
 
     if user_input and cmd_lists.get(user_input.lower()):
+        p_name = user_input.lower()
+        cat = Altruix.get_plugin_category(p_name)
+        cat_badge = "📦 Core / Main Plugin" if cat == "main" else "🧩 Loaded / Extra Plugin"
         await m.handle_message(
-            f"{notice}<b>Help for</b> <code>{user_input}</code>\n\n{cmd_lists[user_input.lower()].strip()}"
+            f"{notice}<b>Help for</b> <code>{p_name}</code>  <i>[{cat_badge}]</i>\n\n{cmd_lists[p_name].strip()}"
         )
     elif not user_input:
-        cmd_list = f"{notice}<i><b>Plugins Available:</b></i>\n\n"
-        for plugins in sorted(cmd_lists.keys()):
-            cmd_list += f"<code>{plugins}</code>  "
-        cmd_list += f"\n\n<i>Use</i> <code>{Altruix.user_command_handler}help &lt;plugin&gt;</code> <i>to know more!</i>"
+        main_plugins, loaded_plugins = Altruix.get_plugins_by_category()
+        cmd_list = f"{notice}⚡ <b><u>Plugins Available</u> :</b>\n\n"
+
+        cmd_list += f"📦 <b>Core / Main Plugins ({len(main_plugins)}):</b>\n"
+        if main_plugins:
+            cmd_list += "  ".join(f"<code>{p}</code>" for p in main_plugins) + "\n\n"
+        else:
+            cmd_list += "<i>None</i>\n\n"
+
+        cmd_list += f"🧩 <b>Loaded / Extra Plugins ({len(loaded_plugins)}):</b>\n"
+        if loaded_plugins:
+            cmd_list += "  ".join(f"<code>{p}</code>" for p in loaded_plugins) + "\n\n"
+        else:
+            cmd_list += "<i>No extra plugins loaded</i>\n\n"
+
+        cmd_list += f"ℹ️ <i>Use</i> <code>{Altruix.user_command_handler}help &lt;plugin&gt;</code> <i>to view detailed command usage and flags.</i>"
         await m.handle_message(cmd_list)
     else:
         matches = get_close_matches(user_input.lower(), cmd_lists.keys(), n=4, cutoff=0.3)

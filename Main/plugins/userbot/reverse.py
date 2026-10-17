@@ -7,7 +7,7 @@
 # All rights reserved.
 
 import random
-import requests
+import httpx
 from PIL import Image
 from io import BytesIO
 from Main import Altruix
@@ -15,7 +15,6 @@ from Main.core.types import AltruixTelegramClient as Client
 from os import remove as rmv
 from bs4 import BeautifulSoup
 from json import loads as j_loads
-from requests import post as r_post
 from time import perf_counter as pc
 from urllib import parse as u_parse
 from Main.core.types.message import Message
@@ -121,7 +120,7 @@ class reverse_search_in_yandex:
             "format": "json",
             "request": '{"blocks":[{"block":"b-page_type_search-by-image__link"}]}',
         }
-        response = r_post(search_URL, params=parameters, files=files)
+        response = httpx.post(search_URL, params=parameters, files=files, timeout=15.0)
         if response.status_code == 400:
             return None
         if response.status_code == 429:
@@ -148,9 +147,9 @@ class reverse_search_in_google:
         searchUrl = "https://www.google.com/searchbyimage/upload"
         multipart = {
             "encoded_image": (self.photo.name, self.photo),
-            "image_content": "",
+            "image_content": ("", b""),
         }
-        response = r_post(searchUrl, files=multipart, allow_redirects=False)
+        response = httpx.post(searchUrl, files=multipart, follow_redirects=False, timeout=15.0)
         if response.status_code == 400:
             return None
         return response.headers.get("Location")
@@ -159,7 +158,7 @@ class reverse_search_in_google:
     def ParseSauce(self, url_):
         url_ = f"{url_}&preferences?hl=en&fg=1#languages"
         results = {}
-        source_s = requests.get(url_, headers=user_agent)
+        source_s = httpx.get(url_, headers=user_agent, follow_redirects=True, timeout=15.0)
         soup = BeautifulSoup(str(source_s.text), "html.parser")
         for similar_image in soup.find_all("input", {"class": "gLFyf"}):
             if similar_image.get("value"):

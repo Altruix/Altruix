@@ -20,4 +20,5 @@ fi
 
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -e .
+.venv/bin/python -m Main.core.apm_env_setup
 exec .venv/bin/python -m Main
