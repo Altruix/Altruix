@@ -7,6 +7,7 @@
 # All rights reserved.
 
 import re
+import html
 import telethon
 from Main import Altruix
 from typing import Optional
@@ -226,3 +227,26 @@ async def help_callback(c, cq):
 
     p_text, p_buttons = await get_plugin_data(text, page=page, category=category)
     await cq.edit(p_text, buttons=p_buttons, parse_mode="html")
+
+
+@Altruix.bot.on_message(filters.command(["help"], prefixes=["/", ".", "!"]))
+@log_errors
+async def bot_help_message_handler(c, m):
+    sender_id = getattr(m, "sender_id", None)
+    if not sender_id or sender_id not in Altruix.auth_users:
+        if getattr(m, "is_private", False):
+            return await m.reply("⚠️ <i>You are not authorized to use this bot.</i>", parse_mode="html")
+        return
+
+    raw_text = getattr(m, "text", "") or getattr(m, "raw_text", "") or ""
+    parts = raw_text.split(None, 1)
+    plugin = parts[1].strip().lower() if len(parts) > 1 else None
+
+    if not plugin:
+        buttons = await get_help_menu(category="all", page=0)
+        await m.reply(help_text, buttons=buttons, parse_mode="html")
+    elif plugin in Altruix._command_help_message_data:
+        p_text, p_buttons = await get_plugin_data(plugin, page=0, category="all")
+        await m.reply(p_text, buttons=p_buttons, parse_mode="html")
+    else:
+        await m.reply(f"<i>Help for</i> <code>{html.escape(plugin)}</code> <i>was not found!</i>", parse_mode="html")

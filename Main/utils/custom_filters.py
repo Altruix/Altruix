@@ -66,11 +66,24 @@ class Filters:
             text = getattr(message, "text", None) or getattr(message, "raw_text", None) or getattr(message, "message", None) or ""
             if not text:
                 return False
+            first_word = text.split()[0].lower() if text.split() else ""
+            if not first_word:
+                return False
             for p in prefixes:
                 for cmd in commands:
                     prefix_cmd = f"{p}{cmd}".lower()
                     if text.lower() == prefix_cmd or text.lower().startswith(f"{prefix_cmd} ") or text.lower().startswith(f"{prefix_cmd}\n"):
                         return True
+                    if first_word.startswith(f"{prefix_cmd}@"):
+                        bot_username = ""
+                        if hasattr(client, "myself") and client.myself:
+                            bot_username = (getattr(client.myself, "username", "") or "").lower()
+                        elif hasattr(client, "get_me"):
+                            import Main
+                            bot_username = (getattr(getattr(Main.Altruix, "bot_info", None), "username", "") or "").lower()
+                        at_target = first_word.split("@", 1)[1]
+                        if not bot_username or at_target == bot_username:
+                            return True
             return False
 
         return Filter(check)

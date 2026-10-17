@@ -53,24 +53,40 @@ async def send_inline_widget(c: Any, m: Any, query: str) -> bool:
     return False
 
 
+def is_owner(sender_id: Optional[int]) -> bool:
+    """Verify if the sender_id belongs to the primary owner or host userbot account."""
+    if not sender_id:
+        return False
+    owner_id = getattr(Altruix.config, "OWNER_ID", None)
+    if owner_id and sender_id == int(owner_id):
+        return True
+    for myself in getattr(Altruix, "ourselves", []):
+        if getattr(myself, "id", None) == sender_id:
+            return True
+    for cl in getattr(Altruix, "clients", []):
+        if hasattr(cl, "myself") and cl.myself and getattr(cl.myself, "id", None) == sender_id:
+            return True
+    return False
+
+
+def is_owner_cb(cq: Any) -> bool:
+    """Verify that the clicking user is strictly the owner (not sudo or stranger)."""
+    sender_id = getattr(cq, "sender_id", 0)
+    return is_owner(sender_id)
+
+
 def is_authorized_cb(cq: Any, allowed_user_id: Optional[int] = None) -> bool:
     """Verify that the clicking user has permission to interact with this control widget."""
     sender_id = getattr(cq, "sender_id", 0)
     if allowed_user_id and sender_id == allowed_user_id:
         return True
 
-    # Owner & Sudo have global authorization
-    owner_id = getattr(Altruix.config, "OWNER_ID", None)
-    if owner_id and sender_id == int(owner_id):
+    if is_owner(sender_id):
         return True
 
     sudo_users = getattr(Altruix.config, "SUDO_USERS", []) or []
     if sender_id in sudo_users:
         return True
-
-    for myself in getattr(Altruix, "ourselves", []):
-        if getattr(myself, "id", None) == sender_id:
-            return True
 
     return False
 

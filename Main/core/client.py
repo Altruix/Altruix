@@ -420,7 +420,41 @@ class AltruixClient:
                     sender_id = getattr(event, "sender_id", None)
                     sudo_users = getattr(self.config, "SUDO_USERS", []) or []
 
-                    if not is_bot_client:
+                    if is_bot_client:
+                        # Security: only owner and authorized sudo users may execute bot commands
+                        owner_id = getattr(self.config, "OWNER_ID", None)
+                        is_owner = False
+                        if owner_id and sender_id == owner_id:
+                            is_owner = True
+                        elif hasattr(self, "ourselves"):
+                            for acc in self.ourselves:
+                                if hasattr(acc, "id") and sender_id == acc.id:
+                                    is_owner = True
+                                    break
+
+                        is_sudo = bool(sender_id and sender_id in sudo_users)
+
+                        if not is_owner and not is_sudo:
+                            return
+
+                        # Sudo user restrictions:
+                        if is_sudo and not is_owner:
+                            # 1. Check disabled sudo plugins / commands
+                            disabled = getattr(self, "disabled_sudo_plugin_list", []) or []
+                            if isinstance(disabled, (list, tuple, set)) and cmd_name in {str(x).lower() for x in disabled}:
+                                return
+                            owner_only_cmds = {
+                                "apm", "apmpanel", "apm_install", "apm_uninstall", "unapm",
+                                "apm_update", "updateapm", "apm_sub", "apmsub", "subcategories",
+                                "apm_enable", "apmenable", "apm_disable", "apmdisable",
+                                "apm_doctor", "apmdoctor", "apm_repair", "apmrepair", "apmfix",
+                                "eval", "exec", "bash", "sh", "terminal", "py", "install",
+                                "addsudo", "rmsudo", "dpfs", "rmdfs",
+                                "restart", "reload", "shutdown", "update", "add_session", "session", "token",
+                            }
+                            if cmd_name in owner_only_cmds or handler_entry.get("file_name") in owner_only_cmds:
+                                return
+                    else:
                         is_self = getattr(event, "out", False)
                         if not is_self and hasattr(client, "myself") and client.myself:
                             if getattr(event, "sender_id", None) == client.myself.id:
@@ -431,6 +465,17 @@ class AltruixClient:
                                 return
                         elif prefix == sudo_p:
                             if not sender_id or sender_id not in sudo_users:
+                                return
+                            owner_only_cmds = {
+                                "apm", "apmpanel", "apm_install", "apm_uninstall", "unapm",
+                                "apm_update", "updateapm", "apm_sub", "apmsub", "subcategories",
+                                "apm_enable", "apmenable", "apm_disable", "apmdisable",
+                                "apm_doctor", "apmdoctor", "apm_repair", "apmrepair", "apmfix",
+                                "eval", "exec", "bash", "sh", "terminal", "py", "install",
+                                "addsudo", "rmsudo", "dpfs", "rmdfs",
+                                "restart", "reload", "shutdown", "update", "add_session", "session", "token",
+                            }
+                            if cmd_name in owner_only_cmds or handler_entry.get("file_name") in owner_only_cmds:
                                 return
                             disabled = getattr(self, "disabled_sudo_plugin_list", []) or []
                             if isinstance(disabled, (list, tuple, set)) and cmd_name in {str(x).lower() for x in disabled}:

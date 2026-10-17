@@ -11,7 +11,7 @@ from telethon import custom
 from Main import Altruix
 from Main.core.decorators import log_errors
 from Main.utils.custom_filters import filters
-from Main.utils.inline_helper import is_authorized_cb
+from Main.utils.inline_helper import is_owner_cb, is_owner
 
 
 def _make_main_menu():
@@ -36,6 +36,14 @@ def _make_main_menu():
 @Altruix.bot.on_inline_query(filters.regex(r"^apm$"))
 @log_errors
 async def apm_inline_query_handler(c, iq):
+    sender_id = getattr(iq, "sender_id", None)
+    if not is_owner(sender_id):
+        return await iq.answer(
+            [],
+            switch_pm="⛔ Access denied: Only bot owner can use APM.",
+            switch_pm_param="unauth",
+        )
+
     builder = iq.builder
     text, buttons = _make_main_menu()
     res = builder.article(
@@ -51,8 +59,8 @@ async def apm_inline_query_handler(c, iq):
 @Altruix.bot.on_callback_query(filters.regex(r"^apm_"))
 @log_errors
 async def apm_callback_handler(c, cq):
-    if not is_authorized_cb(cq):
-        return await cq.answer("⛔ Access denied: You are not authorized to manage plugins.", alert=True)
+    if not is_owner_cb(cq):
+        return await cq.answer("⛔ Access denied: Only the owner can manage plugins.", alert=True)
 
     data = cq.data.decode("utf-8") if isinstance(cq.data, bytes) else str(cq.data)
     pm = Altruix.plugin_manager

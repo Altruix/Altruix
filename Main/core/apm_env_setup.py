@@ -274,7 +274,10 @@ def sync_xtra_plugins_repos() -> bool:
                 git_dir = target_dir / ".git"
                 if git_dir.exists():
                     print(f"[XTRA PLUGINS] Checking updates for ./{repo_name}...")
-                    subprocess.run(["git", "-C", str(target_dir), "pull", "--ff-only"], check=False)
+                    pull_res = subprocess.run(["git", "-C", str(target_dir), "pull", "--ff-only"], check=False)
+                    if pull_res.returncode != 0:
+                        subprocess.run(["git", "-C", str(target_dir), "fetch", "origin"], check=False)
+                        subprocess.run(["git", "-C", str(target_dir), "reset", "--hard", "origin/main"], check=False)
 
             req_file = target_dir / "requirements.txt"
             if req_file.exists():

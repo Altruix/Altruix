@@ -17,6 +17,18 @@ from Main.core.types.message import Message
 packages_list = Altruix.db.make_collection("packages") if Altruix.db else None
 
 
+def verify_owner(m: Message) -> bool:
+    sender_id = getattr(m, "sender_id", None)
+    if sender_id is None and hasattr(m, "from_user") and m.from_user:
+        sender_id = getattr(m.from_user, "id", None)
+    from Main.utils.inline_helper import is_owner
+    if is_owner(sender_id):
+        return True
+    if getattr(m, "is_self", False):
+        return True
+    return False
+
+
 @Altruix.register_on_cmd(
     ["apm", "apmpanel"],
     cmd_help={
@@ -25,6 +37,8 @@ packages_list = Altruix.db.make_collection("packages") if Altruix.db else None
     },
 )
 async def apm_hub_cmd(c, m: Message):
+    if not verify_owner(m):
+        return await m.handle_message("⛔ <b>Access Denied:</b> Only the Altruix owner can use the Package Manager.")
     if not m.user_input:
         from Main.utils.inline_helper import send_inline_widget
         sent = await send_inline_widget(c, m, "apm")
@@ -55,6 +69,8 @@ async def apm_hub_cmd(c, m: Message):
     requires_input=True,
 )
 async def install_pack(c, m: Message):
+    if not verify_owner(m):
+        return await m.handle_message("⛔ <b>Access Denied:</b> Only the Altruix owner can install external packages.")
     msg = await m.handle_message("PROCESSING")
     raw = m.user_input.strip()
 
@@ -227,6 +243,8 @@ async def list_plugin_subcategories(c, m: Message):
     requires_input=True,
 )
 async def enable_subcategory_cmd(c, m: Message):
+    if not verify_owner(m):
+        return await m.handle_message("⛔ <b>Access Denied:</b> Only the Altruix owner can modify plugin subcategories.")
     if not Altruix.plugin_manager:
         return await m.handle_message("❌ Plugin Manager not initialized.")
 
@@ -251,6 +269,8 @@ async def enable_subcategory_cmd(c, m: Message):
     requires_input=True,
 )
 async def disable_subcategory_cmd(c, m: Message):
+    if not verify_owner(m):
+        return await m.handle_message("⛔ <b>Access Denied:</b> Only the Altruix owner can modify plugin subcategories.")
     if not Altruix.plugin_manager:
         return await m.handle_message("❌ Plugin Manager not initialized.")
 
@@ -309,6 +329,8 @@ async def doctor_cmd(c, m: Message):
     },
 )
 async def repair_cmd(c, m: Message):
+    if not verify_owner(m):
+        return await m.handle_message("⛔ <b>Access Denied:</b> Only the Altruix owner can run APM repair.")
     if not Altruix.plugin_manager:
         return await m.handle_message("❌ Plugin Manager not initialized.")
 
@@ -333,6 +355,8 @@ async def repair_cmd(c, m: Message):
     requires_input=True,
 )
 async def uninstall_pack(c, m: Message):
+    if not verify_owner(m):
+        return await m.handle_message("⛔ <b>Access Denied:</b> Only the Altruix owner can uninstall external plugins.")
     msg = await m.handle_message("PROCESSING")
     pn = m.user_input.strip()
 
@@ -371,6 +395,8 @@ async def uninstall_pack(c, m: Message):
     requires_input=True,
 )
 async def update_pack(c, m: Message):
+    if not verify_owner(m):
+        return await m.handle_message("⛔ <b>Access Denied:</b> Only the Altruix owner can update external plugins.")
     msg = await m.handle_message("PROCESSING")
     pn = m.user_input.strip()
 
